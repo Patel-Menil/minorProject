@@ -9,8 +9,9 @@ Simulates a federated learning network across 208 hospital clients:
 3. Hospital clients train the end-to-end model (Encoders + Fusion + GNN + Multi-Task Heads)
    locally using MultiTaskLoss (privacy preserved: data never leaves the hospital).
 4. Central server aggregates local weight updates using FedAvg (weighted by patient count).
-5. Global model is evaluated on held-out hospitals using clinical metrics (AUROC, AUPRC, F1).
-6. Saves best model weights to `pretrained_weights/global_federated_model.pth`.
+5. Global model is scored on validation hospitals each round to pick the best checkpoint
+   (test hospitals are left for benchmark_baselines.py).
+6. Saves best model weights to `results/corrected/global_federated_model.pth`.
 
 Usage
 -----
@@ -18,8 +19,10 @@ Usage
 """
 
 import copy
+import json
 import pathlib
 import random
+import subprocess
 import sys
 from typing import Dict, List, Optional, Tuple
 
@@ -33,10 +36,11 @@ from torch.utils.data import DataLoader
 from src.datasets import (
     EICUTabularDataset,
     EICUTimeSeriesDataset,
-    timeseries_collate_fn,
+    load_hospital_dataset,
 )
-from src.metrics import compute_binary_metrics
+from src.evaluation import evaluate_model
 from src.models import FederatedPatientModel, MultiTaskLoss
+from src.splits import load_or_create_split
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -46,7 +50,9 @@ PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
 PROCESSED_DIR = PROJECT_ROOT / "processed"
 HOSPITALS_DIR = PROCESSED_DIR / "hospitals"
 STATS_PATH = PROCESSED_DIR / "timeseries_stats.json"
-OUTPUT_DIR = PROJECT_ROOT / "pretrained_weights"
+SPLIT_PATH = PROCESSED_DIR / "hospital_split.json"
+# New runs go here; the original results in pretrained_weights/ are left untouched
+OUTPUT_DIR = PROJECT_ROOT / "results" / "corrected"
 
 # Model hyperparameters
 TABULAR_EMB_DIM = 64
@@ -69,9 +75,9 @@ VAL_FRACTION = 0.15    # Fraction of hospitals reserved for validation
 
 # Multi-task loss weights
 W_MORTALITY = 1.0
-W_SEPSIS = 1.0
+W_ICU = 1.0
 POS_WEIGHT_MORTALITY = 3.0  # Counteract ~10-15% positive mortality imbalance
-POS_WEIGHT_SEPSIS = 3.0
+POS_WEIGHT_ICU = 3.0
 
 SEED = 42
 
@@ -92,25 +98,13 @@ def train_local_client(
     """
     Simulates local hospital client training.
     """
-    # Load hospital's local multimodal datasets
-    tab_ds = EICUTabularDataset(hospital_dir, fit_scaler=True)
-    if len(tab_ds) < 2:
-        return global_model.state_dict(), len(tab_ds)
+    # Load hospital's local data, tabular + time-series paired by patient ID
+    ds = load_hospital_dataset(hospital_dir, stats_path=stats_path, max_seq_len=48)
+    if len(ds) < 2:
+        return global_model.state_dict(), len(ds)
 
-    ts_ds = EICUTimeSeriesDataset(
-        hospital_dir,
-        stats_path=stats_path,
-        max_seq_len=48,
-        tabular_dataset=tab_ds,
-    )
-    if len(ts_ds) < 2:
-        return global_model.state_dict(), len(tab_ds)
-
-    # Local data loaders
-    tab_loader = DataLoader(tab_ds, batch_size=batch_size, shuffle=True)
-    ts_loader = DataLoader(
-        ts_ds, batch_size=batch_size, shuffle=True, collate_fn=timeseries_collate_fn
-    )
+    # One loader = one shuffle, so features and labels stay with the same patient
+    loader = DataLoader(ds, batch_size=batch_size, shuffle=True)
 
     # Clone global model for local updates
     local_model = copy.deepcopy(global_model).to(device)
@@ -119,27 +113,27 @@ def train_local_client(
     optimizer = torch.optim.Adam(local_model.parameters(), lr=lr, weight_decay=1e-5)
     criterion = MultiTaskLoss(
         w_mortality=W_MORTALITY,
-        w_sepsis=W_SEPSIS,
+        w_icu=W_ICU,
         pos_weight_mortality=POS_WEIGHT_MORTALITY,
-        pos_weight_sepsis=POS_WEIGHT_SEPSIS,
+        pos_weight_icu=POS_WEIGHT_ICU,
     )
 
-    n_samples = len(tab_ds)
+    n_samples = len(ds)
     steps = 0
 
     for _ in range(local_epochs):
-        for (tab_x, tab_tgt, _), (ts_x, ts_lens, ts_tgt, _) in zip(tab_loader, ts_loader):
+        for tab_x, ts_x, ts_lens, targets, _ in loader:
             if tab_x.size(0) < 2:
                 continue
 
             tab_x = tab_x.to(device)
             ts_x = ts_x.to(device)
             ts_lens = ts_lens.to(device)
-            targets = (ts_tgt if ts_tgt is not None else tab_tgt).to(device)
+            targets = targets.to(device)
 
             optimizer.zero_grad()
             outputs = local_model(tab_x, ts_x, ts_lens)
-            loss, _, _ = criterion(outputs["mortality_logits"], outputs["sepsis_logits"], targets)
+            loss, _, _ = criterion(outputs["mortality_logits"], outputs["icu_logits"], targets)
 
             loss.backward()
             torch.nn.utils.clip_grad_norm_(local_model.parameters(), max_norm=5.0)
@@ -181,93 +175,10 @@ def fedavg_aggregate(
 
 
 # ═══════════════════════════════════════════════════════════════════════════
-#  Validation on Held-out Hospitals
-# ═══════════════════════════════════════════════════════════════════════════
-def evaluate_global_model(
-    model: FederatedPatientModel,
-    val_hospitals: List[pathlib.Path],
-    stats_path: pathlib.Path,
-    device: torch.device,
-    max_eval_hospitals: Optional[int] = 10,
-) -> Dict[str, float]:
-    """
-    Evaluates global model on validation hospitals computing AUROC, AUPRC, and Loss.
-    """
-    model.eval()
-    criterion = MultiTaskLoss(w_mortality=1.0, w_sepsis=1.0)
-
-    all_mort_preds = []
-    all_mort_true = []
-    all_seps_preds = []
-    all_seps_true = []
-    total_loss = 0.0
-    total_batches = 0
-
-    eval_targets = val_hospitals[:max_eval_hospitals] if max_eval_hospitals else val_hospitals
-
-    with torch.no_grad():
-        for hdir in eval_targets:
-            tab_parquet = hdir / "tabular" / "tabular_features.parquet"
-            ts_parquet = hdir / "timeseries" / "timeseries_features.parquet"
-            if not tab_parquet.exists() or not ts_parquet.exists():
-                continue
-
-            tab_ds = EICUTabularDataset(hdir, fit_scaler=True)
-            if len(tab_ds) < 2:
-                continue
-
-            ts_ds = EICUTimeSeriesDataset(hdir, stats_path=stats_path, max_seq_len=48, tabular_dataset=tab_ds)
-            if len(ts_ds) < 2:
-                continue
-
-            tab_loader = DataLoader(tab_ds, batch_size=32, shuffle=False)
-            ts_loader = DataLoader(ts_ds, batch_size=32, shuffle=False, collate_fn=timeseries_collate_fn)
-
-            for (tab_x, tab_tgt, _), (ts_x, ts_lens, ts_tgt, _) in zip(tab_loader, ts_loader):
-                if tab_x.size(0) < 2:
-                    continue
-                tab_x = tab_x.to(device)
-                ts_x = ts_x.to(device)
-                ts_lens = ts_lens.to(device)
-                targets = (ts_tgt if ts_tgt is not None else tab_tgt).to(device)
-
-                outputs = model(tab_x, ts_x, ts_lens)
-                loss, _, _ = criterion(outputs["mortality_logits"], outputs["sepsis_logits"], targets)
-
-                total_loss += loss.item()
-                total_batches += 1
-
-                mort_prob = torch.sigmoid(outputs["mortality_logits"]).cpu().numpy().ravel()
-                seps_prob = torch.sigmoid(outputs["sepsis_logits"]).cpu().numpy().ravel()
-
-                all_mort_preds.extend(mort_prob)
-                all_mort_true.extend(targets[:, 0].cpu().numpy().ravel())
-                all_seps_preds.extend(seps_prob)
-                all_seps_true.extend(targets[:, 1].cpu().numpy().ravel())
-
-    if total_batches == 0:
-        return {"val_loss": 0.0, "mort_auroc": 0.5, "mort_auprc": 0.0, "mort_f1": 0.0, "seps_auroc": 0.5, "seps_auprc": 0.0, "seps_f1": 0.0}
-
-    mort_metrics = compute_binary_metrics(np.array(all_mort_true), np.array(all_mort_preds))
-    seps_metrics = compute_binary_metrics(np.array(all_seps_true), np.array(all_seps_preds))
-
-    return {
-        "val_loss": total_loss / total_batches,
-        "mort_auroc": mort_metrics["auroc"],
-        "mort_auprc": mort_metrics["auprc"],
-        "mort_f1": mort_metrics["f1"],
-        "seps_auroc": seps_metrics["auroc"],
-        "seps_auprc": seps_metrics["auprc"],
-        "seps_f1": seps_metrics["f1"],
-    }
-
-
-# ═══════════════════════════════════════════════════════════════════════════
 #  Main Federated Training Orchestrator
 # ═══════════════════════════════════════════════════════════════════════════
 def main() -> None:
     import argparse
-    import json
 
     parser = argparse.ArgumentParser(description="Federated Multimodal Graph Learning for eICU")
     parser.add_argument("--rounds", type=int, default=5, help="Number of federated communication rounds")
@@ -277,7 +188,9 @@ def main() -> None:
     parser.add_argument("--batch-size", type=int, default=32, help="Client batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--knn-k", type=int, default=5, help="Number of nearest neighbors for patient graph")
-    parser.add_argument("--val-fraction", type=float, default=0.15, help="Fraction of hospitals reserved for validation")
+    parser.add_argument("--val-fraction", type=float, default=0.15, help="Fraction of hospitals for validation (checkpoint selection)")
+    parser.add_argument("--test-fraction", type=float, default=0.15, help="Fraction of hospitals held out for the final benchmark")
+    parser.add_argument("--out-dir", type=pathlib.Path, default=OUTPUT_DIR, help="Folder for the checkpoint, history and run info")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
     args = parser.parse_args()
 
@@ -287,28 +200,23 @@ def main() -> None:
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("=" * 70)
-    print(" 🏥 Federated Multimodal Graph Learning - Mortality & Sepsis Prediction")
+    print(" 🏥 Federated Multimodal Graph Learning - In-Hospital & ICU Mortality Prediction")
     print(f" Device: {device} | GNN: {args.gnn_type.upper()} | Rounds: {args.rounds} | Clients/Round: {args.clients_per_round}")
     print("=" * 70)
 
-    # 1. Discover all hospital directories with both modalities
-    hospital_dirs = sorted([
-        d for d in HOSPITALS_DIR.iterdir()
-        if d.is_dir()
-        and (d / "tabular" / "tabular_features.parquet").exists()
-        and (d / "timeseries" / "timeseries_features.parquet").exists()
-    ])
-    num_total_hospitals = len(hospital_dirs)
-    print(f"\nDiscovered {num_total_hospitals} valid multimodal hospital directories.")
+    # 1-2. Fixed hospital split shared with benchmark_baselines.py.
+    # Test hospitals are never loaded here: they are only for the final benchmark.
+    split = load_or_create_split(HOSPITALS_DIR, SPLIT_PATH, args.seed, args.val_fraction, args.test_fraction)
+    train_hospitals, val_hospitals = split["train"], split["val"]
 
-    # 2. Partition into Train and Validation Hospitals
-    random.shuffle(hospital_dirs)
-    val_count = max(1, int(num_total_hospitals * args.val_fraction))
-    val_hospitals = hospital_dirs[:val_count]
-    train_hospitals = hospital_dirs[val_count:]
-
+    print(f"\nHospital split ({SPLIT_PATH.name}):")
     print(f"  Training Hospitals   : {len(train_hospitals)}")
-    print(f"  Validation Hospitals : {len(val_hospitals)}")
+    print(f"  Validation Hospitals : {len(val_hospitals)} (checkpoint selection only)")
+    print(f"  Test Hospitals       : {len(split['test'])} (not used during training)")
+
+    # Load validation hospitals once; every round is scored on all of them
+    val_datasets = [load_hospital_dataset(h, stats_path=STATS_PATH, max_seq_len=48) for h in val_hospitals]
+    print(f"  Validation Patients  : {sum(len(d) for d in val_datasets)}")
 
     # 3. Detect input dimensions from first hospital
     sample_tab = EICUTabularDataset(train_hospitals[0], fit_scaler=True)
@@ -339,10 +247,30 @@ def main() -> None:
 
     # 5. Federated Training Loop
     best_val_loss = float("inf")
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    save_path = OUTPUT_DIR / "global_federated_model.pth"
-    history_path = OUTPUT_DIR / "training_history.json"
+    args.out_dir.mkdir(parents=True, exist_ok=True)
+    save_path = args.out_dir / "global_federated_model.pth"
+    history_path = args.out_dir / "training_history.json"
     history = []
+
+    # Record what this run used, so its results can be traced and repeated
+    try:
+        commit = subprocess.run(["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=PROJECT_ROOT).stdout.strip()
+        # True means the code differed from that commit when this run started
+        dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "src", "scripts"],
+                                    capture_output=True, text=True, cwd=PROJECT_ROOT).stdout.strip())
+    except OSError:
+        commit, dirty = "unknown", None
+    with open(args.out_dir / "run_info.json", "w") as f:
+        json.dump({
+            "script": "train_federated.py",
+            "git_commit": commit,
+            "uncommitted_code_changes": dirty,
+            "args": {k: str(v) if isinstance(v, pathlib.Path) else v for k, v in vars(args).items()},
+            "split_file": SPLIT_PATH.name,
+            "n_hospitals": {k: len(v) for k, v in split.items()},
+            "n_val_patients": sum(len(d) for d in val_datasets),
+            "checkpoint_selection": "round with the lowest validation loss",
+        }, f, indent=2)
 
     print("\n" + "=" * 70)
     print(f" Starting Federated Training ({args.rounds} Communication Rounds)")
@@ -370,6 +298,7 @@ def main() -> None:
                 client_updates.append((state, n_p))
                 round_patients += n_p
             except Exception as e:
+                print(f"  ! Client {hdir.name} failed and was skipped: {e}")
                 continue
 
         # Central server federated aggregation (FedAvg)
@@ -378,7 +307,8 @@ def main() -> None:
             global_model.load_state_dict(new_global_state)
 
         # Validation evaluation
-        metrics = evaluate_global_model(global_model, val_hospitals, STATS_PATH, device, max_eval_hospitals=10)
+        metrics = evaluate_model(global_model, val_datasets, device)  # raises if nothing was evaluated
+        metrics["val_loss"] = metrics.pop("loss")
 
         is_best = metrics["val_loss"] < best_val_loss
         marker = " 🌟 [BEST]" if is_best else ""
@@ -398,13 +328,15 @@ def main() -> None:
             "round": round_idx,
             "clients": len(client_updates),
             "patients": round_patients,
+            "val_hospitals": metrics["n_hospitals"],
+            "val_patients": metrics["n_patients"],
             "val_loss": round(metrics["val_loss"], 4),
             "mort_auroc": round(metrics["mort_auroc"], 4),
             "mort_auprc": round(metrics["mort_auprc"], 4),
             "mort_f1": round(metrics["mort_f1"], 4),
-            "seps_auroc": round(metrics["seps_auroc"], 4),
-            "seps_auprc": round(metrics["seps_auprc"], 4),
-            "seps_f1": round(metrics["seps_f1"], 4),
+            "icu_auroc": round(metrics["icu_auroc"], 4),
+            "icu_auprc": round(metrics["icu_auprc"], 4),
+            "icu_f1": round(metrics["icu_f1"], 4),
         }
         history.append(round_record)
 
@@ -413,7 +345,7 @@ def main() -> None:
             f"Clients: {len(client_updates):2d} ({round_patients:4d} pts) | "
             f"Loss: {metrics['val_loss']:.4f} | "
             f"Mort AUROC: {metrics['mort_auroc']:.4f} (AUPRC: {metrics['mort_auprc']:.4f}) | "
-            f"Seps AUROC: {metrics['seps_auroc']:.4f}{marker}"
+            f"ICU AUROC: {metrics['icu_auroc']:.4f}{marker}"
         )
 
     # Save training history

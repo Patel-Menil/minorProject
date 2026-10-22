@@ -14,7 +14,7 @@ sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
 import torch
 from torch.utils.data import DataLoader
 
-from src.datasets import EICUTabularDataset, EICUTimeSeriesDataset, timeseries_collate_fn
+from src.datasets import load_hospital_dataset
 from src.encoders import TabularEncoder, TimeSeriesLSTM
 from src.fusion import MultimodalFusion
 from src.graph_builder import build_knn_graph, build_threshold_graph
@@ -30,17 +30,12 @@ def main():
     print("=" * 60)
 
     # 1. Load Data
-    tab_ds = EICUTabularDataset(HOSPITAL_DIR, fit_scaler=True)
-    ts_ds = EICUTimeSeriesDataset(HOSPITAL_DIR, STATS_PATH, max_seq_len=48, tabular_dataset=tab_ds)
-    ts_loader = DataLoader(ts_ds, batch_size=16, shuffle=False, collate_fn=timeseries_collate_fn)
-    tab_loader = DataLoader(tab_ds, batch_size=16, shuffle=False)
-
-    features, _, _ = next(iter(tab_loader))
-    seqs, lens, _, pids = next(iter(ts_loader))
+    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH, max_seq_len=48)
+    features, seqs, lens, _, pids = next(iter(DataLoader(ds, batch_size=16, shuffle=False)))
 
     # 2. Encoders (Step 2)
-    tab_enc = TabularEncoder(input_dim=tab_ds.input_dim, embedding_dim=64)
-    ts_enc = TimeSeriesLSTM(input_dim=ts_ds.input_dim, hidden_dim=64, embedding_dim=64)
+    tab_enc = TabularEncoder(input_dim=ds.tabular_dim, embedding_dim=64)
+    ts_enc = TimeSeriesLSTM(input_dim=ds.timeseries_dim, hidden_dim=64, embedding_dim=64)
     
     with torch.no_grad():
         tab_emb = tab_enc(features)

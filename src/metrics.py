@@ -1,7 +1,7 @@
 """
 metrics.py
 ----------
-Clinical evaluation metrics for mortality and sepsis prediction tasks:
+Clinical evaluation metrics for in-hospital and ICU mortality prediction tasks:
 - AUROC (Area under the Receiver Operating Characteristic curve)
 - AUPRC (Area under the Precision-Recall curve, critical for imbalanced clinical outcomes)
 - F1-Score, Precision, Recall / Sensitivity, Specificity

@@ -128,7 +128,7 @@ def generate_figure_2():
     ax.add_patch(h1)
     ax.add_patch(h2)
     ax.text(8.85, out_y1, "Task 1:\nIn-Hospital Mortality", ha="center", va="center", fontsize=8, weight="bold", color="#991b1b")
-    ax.text(8.85, out_y2, "Task 2:\nSepsis / ICU Mortality", ha="center", va="center", fontsize=8, weight="bold", color="#9a3412")
+    ax.text(8.85, out_y2, "Task 2:\nICU Mortality", ha="center", va="center", fontsize=8, weight="bold", color="#9a3412")
 
     ax.annotate("", xy=(8.85, out_y1 - 0.4), xytext=(8.85, 3.1),
                 arrowprops=dict(arrowstyle="->", color="#dc2626", lw=1.5, mutation_scale=12))
@@ -193,7 +193,7 @@ def generate_figure_4():
         loss = [1.1308, 0.9773, 0.9213, 0.8845, 0.9288]
         mort_auroc = [0.5803, 0.4806, 0.4967, 0.5120, 0.5321]
         mort_auprc = [0.0952, 0.0792, 0.0780, 0.0912, 0.1182]
-        seps_auroc = [0.6713, 0.5837, 0.5646, 0.4862, 0.5523]
+        icu_auroc = [0.6713, 0.5837, 0.5646, 0.4862, 0.5523]
     else:
         with open(history_file) as f:
             data = json.load(f)
@@ -201,7 +201,7 @@ def generate_figure_4():
         loss = [d["val_loss"] for d in data]
         mort_auroc = [d["mort_auroc"] for d in data]
         mort_auprc = [d["mort_auprc"] for d in data]
-        seps_auroc = [d["seps_auroc"] for d in data]
+        icu_auroc = [d["icu_auroc"] for d in data]
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4.2))
 
@@ -216,7 +216,7 @@ def generate_figure_4():
 
     # Clinical AUROC curves
     ax2.plot(rounds, mort_auroc, marker="s", color="#2563eb", lw=2, markersize=6, label="Mortality AUROC")
-    ax2.plot(rounds, seps_auroc, marker="^", color="#16a34a", lw=2, markersize=6, label="Sepsis AUROC")
+    ax2.plot(rounds, icu_auroc, marker="^", color="#16a34a", lw=2, markersize=6, label="ICU Mortality AUROC")
     ax2.plot(rounds, mort_auprc, marker="d", color="#d97706", lw=1.8, linestyle="--", markersize=6, label="Mortality AUPRC")
     ax2.set_title("Held-Out Clinical Metric Evolution")
     ax2.set_xlabel("Communication Round")
@@ -242,9 +242,9 @@ def generate_figure_5():
             data = json.load(f)
     else:
         data = {
-            "Local-Only Model (No Fed)": {"loss": 0.9986, "mort_auroc": 0.5636, "mort_auprc": 0.0956, "seps_auroc": 0.4772},
-            "Multimodal No-GNN Ablation": {"loss": 0.8076, "mort_auroc": 0.6768, "mort_auprc": 0.2867, "seps_auroc": 0.7889},
-            "Federated Graph Model (Proposed)": {"loss": 0.8404, "mort_auroc": 0.5672, "mort_auprc": 0.0998, "seps_auroc": 0.5526},
+            "Local-Only Model (No Fed)": {"loss": 0.9986, "mort_auroc": 0.5636, "mort_auprc": 0.0956, "icu_auroc": 0.4772},
+            "Multimodal No-GNN Ablation": {"loss": 0.8076, "mort_auroc": 0.6768, "mort_auprc": 0.2867, "icu_auroc": 0.7889},
+            "Federated Graph Model (Proposed)": {"loss": 0.8404, "mort_auroc": 0.5672, "mort_auprc": 0.0998, "icu_auroc": 0.5526},
         }
 
     models = list(data.keys())
@@ -254,13 +254,13 @@ def generate_figure_5():
     width = 0.25
 
     mort_auroc = [data[m]["mort_auroc"] for m in models]
-    seps_auroc = [data[m]["seps_auroc"] for m in models]
+    icu_auroc = [data[m]["icu_auroc"] for m in models]
     mort_auprc = [data[m]["mort_auprc"] for m in models]
 
     fig, ax = plt.subplots(figsize=(9, 4.5))
 
     r1 = ax.bar(x - width, mort_auroc, width, label="Mortality AUROC", color="#3b82f6", edgecolor="#1d4ed8")
-    r2 = ax.bar(x, seps_auroc, width, label="Sepsis AUROC", color="#10b981", edgecolor="#047857")
+    r2 = ax.bar(x, icu_auroc, width, label="ICU Mortality AUROC", color="#10b981", edgecolor="#047857")
     r3 = ax.bar(x + width, mort_auprc, width, label="Mortality AUPRC", color="#f59e0b", edgecolor="#b45309")
 
     ax.set_ylabel("Validation Performance")

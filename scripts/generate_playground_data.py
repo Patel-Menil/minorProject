@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 # Add project root to path so we can import src
 sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
 
-from src.datasets import EICUTabularDataset, EICUTimeSeriesDataset, timeseries_collate_fn
+from src.datasets import load_hospital_dataset
 from src.encoders import TabularEncoder, TimeSeriesLSTM
 from src.fusion import MultimodalFusion
 from src.graph_builder import build_knn_graph
@@ -22,20 +22,16 @@ def main():
     print("Generating playground data from hospital_102...")
     
     # 1. Load Data
-    tab_ds = EICUTabularDataset(HOSPITAL_DIR, fit_scaler=True)
-    ts_ds = EICUTimeSeriesDataset(HOSPITAL_DIR, STATS_PATH, max_seq_len=48, tabular_dataset=tab_ds)
+    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH, max_seq_len=48)
     
     # We will just load all patients from this hospital (batch_size = len)
     # Hospital_102 has 31 patients. Let's load them all.
-    tab_loader = DataLoader(tab_ds, batch_size=64, shuffle=False)
-    ts_loader = DataLoader(ts_ds, batch_size=64, shuffle=False, collate_fn=timeseries_collate_fn)
-    
-    features, _, _ = next(iter(tab_loader))
-    seqs, lens, targets, pids = next(iter(ts_loader))
+    features, seqs, lens, targets, pids = next(iter(DataLoader(ds, batch_size=64, shuffle=False)))
+    pids = pids.tolist()
 
     # 2. Encoders
-    tab_enc = TabularEncoder(input_dim=tab_ds.input_dim, embedding_dim=64)
-    ts_enc = TimeSeriesLSTM(input_dim=ts_ds.input_dim, hidden_dim=64, embedding_dim=64)
+    tab_enc = TabularEncoder(input_dim=ds.tabular_dim, embedding_dim=64)
+    ts_enc = TimeSeriesLSTM(input_dim=ds.timeseries_dim, hidden_dim=64, embedding_dim=64)
     
     with torch.no_grad():
         tab_emb = tab_enc(features)

@@ -8,7 +8,7 @@ Combines:
 - Step 3 Fusion (MultimodalFusion)
 - Step 4 Graph Builder (build_knn_graph / build_threshold_graph)
 - Step 5 Graph Neural Network (PatientGNN)
-- Step 6 Multi-Task Prediction Heads (Mortality & Sepsis/ICU outcomes)
+- Step 6 Multi-Task Prediction Heads (In-Hospital & ICU Mortality)
 
 Provides a clean, unified PyTorch model suitable for local hospital client
 training and federated parameter aggregation (FedAvg).
@@ -31,7 +31,7 @@ class MultiTaskPredictionHeads(nn.Module):
     """
     Two prediction heads attached to the graph-enhanced patient representations:
     - Task 1: In-hospital Mortality prediction (binary classification)
-    - Task 2: Sepsis / ICU mortality prediction (binary classification)
+    - Task 2: ICU mortality prediction (binary classification)
 
     Outputs raw logits for use with BCEWithLogitsLoss.
 
@@ -62,8 +62,8 @@ class MultiTaskPredictionHeads(nn.Module):
             nn.Linear(hidden_dim, 1),
         )
 
-        # Task 2: Sepsis / ICU Mortality Head
-        self.sepsis_head = nn.Sequential(
+        # Task 2: ICU Mortality Head
+        self.icu_mortality_head = nn.Sequential(
             nn.Linear(in_channels, hidden_dim),
             nn.BatchNorm1d(hidden_dim),
             nn.ReLU(inplace=True),
@@ -80,11 +80,11 @@ class MultiTaskPredictionHeads(nn.Module):
         Returns
         -------
         mortality_logits : FloatTensor of shape (num_patients, 1)
-        sepsis_logits    : FloatTensor of shape (num_patients, 1)
+        icu_logits    : FloatTensor of shape (num_patients, 1)
         """
         mortality_logits = self.mortality_head(graph_emb)
-        sepsis_logits = self.sepsis_head(graph_emb)
-        return mortality_logits, sepsis_logits
+        icu_logits = self.icu_mortality_head(graph_emb)
+        return mortality_logits, icu_logits
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -101,7 +101,7 @@ class FederatedPatientModel(nn.Module):
     3. Tabular + Time-series   → MultimodalFusion → Unified Embedding (128D)
     4. Unified Embeddings      → Patient Graph    → Intra-hospital Graph
     5. Graph + Embeddings      → PatientGNN       → Graph-Enhanced Emb (64D)
-    6. Graph-Enhanced Emb      → Heads            → Mortality & Sepsis Logits
+    6. Graph-Enhanced Emb      → Heads            → Hospital & ICU Mortality Logits
 
     Parameters
     ----------
@@ -214,7 +214,7 @@ class FederatedPatientModel(nn.Module):
         -------
         output_dict : dict containing
             - 'mortality_logits': (batch_size, 1)
-            - 'sepsis_logits': (batch_size, 1)
+            - 'icu_logits': (batch_size, 1)
             - 'tab_emb': (batch_size, tabular_emb_dim)
             - 'ts_emb': (batch_size, timeseries_emb_dim)
             - 'fused_emb': (batch_size, fused_dim)
@@ -237,11 +237,11 @@ class FederatedPatientModel(nn.Module):
         graph_emb = self.gnn(fused_emb, edge_index, edge_weight)
 
         # 5. Multi-task Prediction
-        mortality_logits, sepsis_logits = self.heads(graph_emb)
+        mortality_logits, icu_logits = self.heads(graph_emb)
 
         return {
             "mortality_logits": mortality_logits,
-            "sepsis_logits": sepsis_logits,
+            "icu_logits": icu_logits,
             "tab_emb": tab_emb,
             "ts_emb": ts_emb,
             "fused_emb": fused_emb,
@@ -256,75 +256,75 @@ class FederatedPatientModel(nn.Module):
 # ═══════════════════════════════════════════════════════════════════════════
 class MultiTaskLoss(nn.Module):
     """
-    Joint loss function combining in-hospital mortality loss and sepsis/ICU mortality loss.
+    Joint loss function combining in-hospital mortality loss and ICU mortality loss.
 
     Formula
     -------
     Loss = w_mortality * BCEWithLogits(mortality_logits, y_mortality)
-         + w_sepsis * BCEWithLogits(sepsis_logits, y_sepsis)
+         + w_icu * BCEWithLogits(icu_logits, y_icu)
 
     Parameters
     ----------
     w_mortality : float
         Weight for mortality prediction loss (default: 1.0).
-    w_sepsis : float
-        Weight for sepsis prediction loss (default: 1.0).
+    w_icu : float
+        Weight for ICU mortality loss (default: 1.0).
     pos_weight_mortality : float or None
         Positive class weighting factor for mortality imbalance (e.g. 5.0).
-    pos_weight_sepsis : float or None
-        Positive class weighting factor for sepsis imbalance.
+    pos_weight_icu : float or None
+        Positive class weighting factor for ICU mortality imbalance.
     """
 
     def __init__(
         self,
         w_mortality: float = 1.0,
-        w_sepsis: float = 1.0,
+        w_icu: float = 1.0,
         pos_weight_mortality: Optional[float] = None,
-        pos_weight_sepsis: Optional[float] = None,
+        pos_weight_icu: Optional[float] = None,
     ) -> None:
         super().__init__()
         self.w_mortality = w_mortality
-        self.w_sepsis = w_sepsis
+        self.w_icu = w_icu
 
         pw_mort = torch.tensor([pos_weight_mortality]) if pos_weight_mortality is not None else None
-        pw_seps = torch.tensor([pos_weight_sepsis]) if pos_weight_sepsis is not None else None
+        pw_icu = torch.tensor([pos_weight_icu]) if pos_weight_icu is not None else None
 
         self.loss_mortality = nn.BCEWithLogitsLoss(pos_weight=pw_mort)
-        self.loss_sepsis = nn.BCEWithLogitsLoss(pos_weight=pw_seps)
+        self.loss_icu = nn.BCEWithLogitsLoss(pos_weight=pw_icu)
 
     def forward(
         self,
         mortality_logits: torch.Tensor,
-        sepsis_logits: torch.Tensor,
+        icu_logits: torch.Tensor,
         targets: torch.Tensor,
     ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """
         Parameters
         ----------
         mortality_logits : FloatTensor of shape (batch_size, 1)
-        sepsis_logits    : FloatTensor of shape (batch_size, 1)
+        icu_logits    : FloatTensor of shape (batch_size, 1)
         targets          : FloatTensor of shape (batch_size, 4)
             Index 0: hospital_expired (mortality target)
-            Index 1: icu_expired (sepsis / ICU mortality target)
+            Index 1: icu_expired (ICU mortality target)
 
         Returns
         -------
         total_loss : scalar FloatTensor
         loss_mort  : scalar FloatTensor
-        loss_seps  : scalar FloatTensor
+        loss_icu  : scalar FloatTensor
         """
         # Target index 0: hospital_expired, Index 1: icu_expired
         y_mort = targets[:, 0:1]
-        y_seps = targets[:, 1:2]
+        y_icu = targets[:, 1:2]
 
         # Device alignment for pos_weight if needed
         if self.loss_mortality.pos_weight is not None:
             self.loss_mortality.pos_weight = self.loss_mortality.pos_weight.to(mortality_logits.device)
-        if self.loss_sepsis.pos_weight is not None:
-            self.loss_sepsis.pos_weight = self.loss_sepsis.pos_weight.to(sepsis_logits.device)
+        if self.loss_icu.pos_weight is not None:
+            self.loss_icu.pos_weight = self.loss_icu.pos_weight.to(icu_logits.device)
 
         loss_mort = self.loss_mortality(mortality_logits, y_mort)
-        loss_seps = self.loss_sepsis(sepsis_logits, y_seps)
+        loss_icu = self.loss_icu(icu_logits, y_icu)
 
-        total_loss = self.w_mortality * loss_mort + self.w_sepsis * loss_seps
-        return total_loss, loss_mort, loss_seps
+        total_loss = self.w_mortality * loss_mort + self.w_icu * loss_icu
+        return total_loss, loss_mort, loss_icu
