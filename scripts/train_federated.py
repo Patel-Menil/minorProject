@@ -94,14 +94,20 @@ def train_local_client(
     lr: float,
     device: torch.device,
     max_steps_per_client: int = 30,
-) -> Tuple[Dict[str, torch.Tensor], int]:
+) -> Tuple[Dict[str, torch.Tensor], Dict]:
     """
     Simulates local hospital client training.
+
+    Returns the local weights and counts of what was actually trained:
+    "patients" (hospital cohort size), "examples" (patients fed to optimizer
+    steps, repeats included), "steps" and "patient_ids" (unique patients used).
+    FedAvg weights clients by "examples", not by cohort size.
     """
     # Load hospital's local data, tabular + time-series paired by patient ID
     ds = load_hospital_dataset(hospital_dir, stats_path=stats_path, max_seq_len=48)
+    stats = {"patients": len(ds), "examples": 0, "steps": 0, "patient_ids": set()}
     if len(ds) < 2:
-        return global_model.state_dict(), len(ds)
+        return global_model.state_dict(), stats  # 0 examples -> zero weight in FedAvg
 
     # One loader = one shuffle, so features and labels stay with the same patient
     loader = DataLoader(ds, batch_size=batch_size, shuffle=True)
@@ -118,12 +124,11 @@ def train_local_client(
         pos_weight_icu=POS_WEIGHT_ICU,
     )
 
-    n_samples = len(ds)
     steps = 0
 
     for _ in range(local_epochs):
-        for tab_x, ts_x, ts_lens, targets, _ in loader:
-            if tab_x.size(0) < 2:
+        for tab_x, ts_x, ts_lens, targets, pids in loader:
+            if tab_x.size(0) < 2:  # BatchNorm cannot train on a single patient
                 continue
 
             tab_x = tab_x.to(device)
@@ -140,12 +145,15 @@ def train_local_client(
             optimizer.step()
 
             steps += 1
+            stats["examples"] += tab_x.size(0)
+            stats["patient_ids"].update(pids.tolist())
             if steps >= max_steps_per_client:
                 break
         if steps >= max_steps_per_client:
             break
 
-    return local_model.state_dict(), n_samples
+    stats["steps"] = steps
+    return local_model.state_dict(), stats
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -157,19 +165,26 @@ def fedavg_aggregate(
 ) -> Dict[str, torch.Tensor]:
     """
     Computes sample-weighted FedAvg parameter aggregation.
+
+    `n` for each client is the number of examples it actually trained on, so a
+    client that took no optimizer step (n = 0) does not pull the average back.
+    Float tensors (weights and BatchNorm running mean/var) are averaged.
+    Integer buffers (BatchNorm num_batches_tracked) are counters, not weights,
+    so they keep the global value.
     """
     total_samples = sum(n for _, n in client_updates)
     if total_samples == 0:
         return global_state
 
-    new_state = copy.deepcopy(global_state)
-    for k in new_state:
-        new_state[k] = torch.zeros_like(new_state[k], dtype=torch.float32)
-
-    for client_state, n_k in client_updates:
-        weight = n_k / total_samples
-        for k in new_state:
-            new_state[k] += client_state[k].to(new_state[k].device).float() * weight
+    new_state = {}
+    for k, v in global_state.items():
+        if not v.is_floating_point():
+            new_state[k] = v.clone()
+            continue
+        new_state[k] = sum(
+            client_state[k].to(v.device).float() * (n_k / total_samples)
+            for client_state, n_k in client_updates
+        ).to(v.dtype)
 
     return new_state
 
@@ -247,6 +262,7 @@ def main() -> None:
 
     # 5. Federated Training Loop
     best_val_loss = float("inf")
+    trained_ids: set = set()  # unique patients used in any optimizer step so far
     args.out_dir.mkdir(parents=True, exist_ok=True)
     save_path = args.out_dir / "global_federated_model.pth"
     history_path = args.out_dir / "training_history.json"
@@ -281,12 +297,13 @@ def main() -> None:
         sampled_hospitals = random.sample(train_hospitals, min(len(train_hospitals), args.clients_per_round))
 
         client_updates = []
-        round_patients = 0
+        round_patients = round_examples = round_steps = failed_clients = 0
+        round_ids = set()
 
         # Hospital clients train locally
         for hdir in sampled_hospitals:
             try:
-                state, n_p = train_local_client(
+                state, stats = train_local_client(
                     global_model=global_model,
                     hospital_dir=hdir,
                     stats_path=STATS_PATH,
@@ -295,11 +312,16 @@ def main() -> None:
                     lr=args.lr,
                     device=device,
                 )
-                client_updates.append((state, n_p))
-                round_patients += n_p
+                client_updates.append((state, stats["examples"]))
+                round_patients += stats["patients"]
+                round_examples += stats["examples"]
+                round_steps += stats["steps"]
+                round_ids |= stats["patient_ids"]
             except Exception as e:
+                failed_clients += 1
                 print(f"  ! Client {hdir.name} failed and was skipped: {e}")
                 continue
+        trained_ids |= round_ids
 
         # Central server federated aggregation (FedAvg)
         if client_updates:
@@ -327,7 +349,12 @@ def main() -> None:
         round_record = {
             "round": round_idx,
             "clients": len(client_updates),
-            "patients": round_patients,
+            "failed_clients": failed_clients,
+            "cohort_patients": round_patients,          # sum of sampled hospitals' sizes
+            "examples_trained": round_examples,         # patients in optimizer steps (repeats counted)
+            "optimizer_steps": round_steps,
+            "unique_patients_trained": len(round_ids),
+            "unique_patients_trained_so_far": len(trained_ids),
             "val_hospitals": metrics["n_hospitals"],
             "val_patients": metrics["n_patients"],
             "val_loss": round(metrics["val_loss"], 4),
@@ -342,7 +369,7 @@ def main() -> None:
 
         print(
             f" Round {round_idx:2d}/{args.rounds} | "
-            f"Clients: {len(client_updates):2d} ({round_patients:4d} pts) | "
+            f"Clients: {len(client_updates):2d} ({round_examples:4d} examples, {round_steps} steps) | "
             f"Loss: {metrics['val_loss']:.4f} | "
             f"Mort AUROC: {metrics['mort_auroc']:.4f} (AUPRC: {metrics['mort_auprc']:.4f}) | "
             f"ICU AUROC: {metrics['icu_auroc']:.4f}{marker}"
@@ -355,6 +382,7 @@ def main() -> None:
     print("\n" + "=" * 70)
     print(f" ✅ Federated Learning Completed Successfully!")
     print(f" Best Validation Loss: {best_val_loss:.4f}")
+    print(f" Unique patients used in training: {len(trained_ids)}")
     print(f" Global Model Saved to   : {save_path}")
     print(f" Training History Saved to: {history_path}")
     print("=" * 70)

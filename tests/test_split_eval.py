@@ -63,10 +63,6 @@ def tiny_model():
 def test_evaluation_fails_loudly_when_nothing_is_evaluated(tmp_path):
     with pytest.raises(RuntimeError, match="No patients were evaluated"):
         evaluate_model(tiny_model(), [], torch.device("cpu"))
-    # A 1-patient hospital forms only a 1-patient batch, which is skipped
-    one = load_hospital_dataset(make_hospital(tmp_path, [5], [5]))
-    with pytest.raises(RuntimeError):
-        evaluate_model(tiny_model(), [one], torch.device("cpu"))
 
 
 def test_evaluation_counts_every_patient(tmp_path):
@@ -74,6 +70,5 @@ def test_evaluation_counts_every_patient(tmp_path):
     ds = load_hospital_dataset(make_hospital(tmp_path, pids, pids))
     m = evaluate_model(tiny_model(), [ds], torch.device("cpu"), batch_size=4)
     assert m["n_hospitals"] == 1
-    assert m["n_patients"] == 8 and m["n_skipped"] == 1
-    assert m["n_patients"] + m["n_skipped"] == len(ds)
+    assert m["n_patients"] == len(ds)  # the lone last patient is evaluated too
     assert 0.0 <= m["mort_auroc"] <= 1.0 and m["loss"] > 0

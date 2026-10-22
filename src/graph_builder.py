@@ -36,9 +36,14 @@ def build_knn_graph(
     Returns
     -------
     edge_index : LongTensor of shape (2, num_edges)
-        Standard PyTorch Geometric format for graph edges.
+        Standard PyTorch Geometric format for graph edges. Edges point from
+        neighbour to patient (edge_index[0] = neighbour, edge_index[1] = patient),
+        because PyG sends messages from edge_index[0] to edge_index[1]. So every
+        patient receives messages from exactly its own k most similar patients.
+        The graph is directed (not symmetrised); self-loops are not added here
+        (SAGE keeps a separate self term, GAT/GCN add self-loops internally).
     edge_weight : FloatTensor of shape (num_edges,)
-        The similarity scores for each edge.
+        The similarity scores for each edge (used by GCN only).
     """
     num_patients = embeddings.size(0)
     
@@ -76,11 +81,11 @@ def build_knn_graph(
     else:
         raise ValueError(f"Unsupported metric: {metric}")
 
-    # Build the edge_index array
-    source_nodes = torch.arange(num_patients, device=embeddings.device).view(-1, 1).expand(-1, k_actual).flatten()
-    target_nodes = indices.flatten()
-    
-    edge_index = torch.stack([source_nodes, target_nodes], dim=0)
+    # Build the edge_index array: message flows neighbour -> patient
+    patient_nodes = torch.arange(num_patients, device=embeddings.device).view(-1, 1).expand(-1, k_actual).flatten()
+    neighbour_nodes = indices.flatten()
+
+    edge_index = torch.stack([neighbour_nodes, patient_nodes], dim=0)
     edge_weight = scores.flatten()
 
     return edge_index, edge_weight
