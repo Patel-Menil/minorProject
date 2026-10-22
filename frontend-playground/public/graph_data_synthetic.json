@@ -1,0 +1,1104 @@
+{
+  "meta": {
+    "source": "synthetic",
+    "description": "Synthetic demonstration data: random numbers, not real patients and not model output.",
+    "graph": "random k-NN graph (k=3) built within batches of 32",
+    "patients": 60
+  },
+  "nodes": [
+    {
+      "id": "P17",
+      "pred_mortality": 0.0848,
+      "pred_icu_mortality": 0.0622,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P28",
+      "pred_mortality": 0.0332,
+      "pred_icu_mortality": 0.0228,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P21",
+      "pred_mortality": 0.2893,
+      "pred_icu_mortality": 0.1637,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P9",
+      "pred_mortality": 0.3908,
+      "pred_icu_mortality": 0.298,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P43",
+      "pred_mortality": 0.0097,
+      "pred_icu_mortality": 0.0046,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P35",
+      "pred_mortality": 0.1456,
+      "pred_icu_mortality": 0.1119,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P52",
+      "pred_mortality": 0.1204,
+      "pred_icu_mortality": 0.1017,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P5",
+      "pred_mortality": 0.1139,
+      "pred_icu_mortality": 0.0543,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P53",
+      "pred_mortality": 0.0785,
+      "pred_icu_mortality": 0.0492,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P58",
+      "pred_mortality": 0.0046,
+      "pred_icu_mortality": 0.0033,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P11",
+      "pred_mortality": 0.0358,
+      "pred_icu_mortality": 0.0278,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P3",
+      "pred_mortality": 0.1582,
+      "pred_icu_mortality": 0.1411,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P45",
+      "pred_mortality": 0.2723,
+      "pred_icu_mortality": 0.2229,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P24",
+      "pred_mortality": 0.0576,
+      "pred_icu_mortality": 0.0437,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P25",
+      "pred_mortality": 0.1117,
+      "pred_icu_mortality": 0.0725,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P44",
+      "pred_mortality": 0.1503,
+      "pred_icu_mortality": 0.13,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P12",
+      "pred_mortality": 0.039,
+      "pred_icu_mortality": 0.0266,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P36",
+      "pred_mortality": 0.035,
+      "pred_icu_mortality": 0.029,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P31",
+      "pred_mortality": 0.1695,
+      "pred_icu_mortality": 0.1381,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P19",
+      "pred_mortality": 0.0414,
+      "pred_icu_mortality": 0.0363,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P55",
+      "pred_mortality": 0.3006,
+      "pred_icu_mortality": 0.2574,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P4",
+      "pred_mortality": 0.0624,
+      "pred_icu_mortality": 0.05,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P2",
+      "pred_mortality": 0.1852,
+      "pred_icu_mortality": 0.0856,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P56",
+      "pred_mortality": 0.0313,
+      "pred_icu_mortality": 0.0168,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P18",
+      "pred_mortality": 0.0239,
+      "pred_icu_mortality": 0.0116,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P22",
+      "pred_mortality": 0.0046,
+      "pred_icu_mortality": 0.0038,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P37",
+      "pred_mortality": 0.0764,
+      "pred_icu_mortality": 0.0503,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P1",
+      "pred_mortality": 0.2165,
+      "pred_icu_mortality": 0.1721,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P29",
+      "pred_mortality": 0.2609,
+      "pred_icu_mortality": 0.1997,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P7",
+      "pred_mortality": 0.157,
+      "pred_icu_mortality": 0.1396,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P20",
+      "pred_mortality": 0.0243,
+      "pred_icu_mortality": 0.0217,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P49",
+      "pred_mortality": 0.1639,
+      "pred_icu_mortality": 0.0805,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P23",
+      "pred_mortality": 0.1143,
+      "pred_icu_mortality": 0.0612,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P27",
+      "pred_mortality": 0.1607,
+      "pred_icu_mortality": 0.1162,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P38",
+      "pred_mortality": 0.0895,
+      "pred_icu_mortality": 0.0373,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P47",
+      "pred_mortality": 0.1127,
+      "pred_icu_mortality": 0.0912,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P59",
+      "pred_mortality": 0.3324,
+      "pred_icu_mortality": 0.2739,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P33",
+      "pred_mortality": 0.1466,
+      "pred_icu_mortality": 0.0768,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P26",
+      "pred_mortality": 0.0802,
+      "pred_icu_mortality": 0.0624,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P54",
+      "pred_mortality": 0.2969,
+      "pred_icu_mortality": 0.139,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P10",
+      "pred_mortality": 0.528,
+      "pred_icu_mortality": 0.3352,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P39",
+      "pred_mortality": 0.1936,
+      "pred_icu_mortality": 0.1485,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P48",
+      "pred_mortality": 0.0213,
+      "pred_icu_mortality": 0.0119,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P51",
+      "pred_mortality": 0.0718,
+      "pred_icu_mortality": 0.0643,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P41",
+      "pred_mortality": 0.1378,
+      "pred_icu_mortality": 0.0751,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P14",
+      "pred_mortality": 0.1193,
+      "pred_icu_mortality": 0.0531,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P13",
+      "pred_mortality": 0.3238,
+      "pred_icu_mortality": 0.255,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P8",
+      "pred_mortality": 0.077,
+      "pred_icu_mortality": 0.0422,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P46",
+      "pred_mortality": 0.0244,
+      "pred_icu_mortality": 0.0141,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P40",
+      "pred_mortality": 0.1721,
+      "pred_icu_mortality": 0.1198,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P60",
+      "pred_mortality": 0.2969,
+      "pred_icu_mortality": 0.2094,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P6",
+      "pred_mortality": 0.0773,
+      "pred_icu_mortality": 0.0352,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P50",
+      "pred_mortality": 0.0923,
+      "pred_icu_mortality": 0.0533,
+      "true_hospital_expired": true,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P15",
+      "pred_mortality": 0.151,
+      "pred_icu_mortality": 0.1306,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P30",
+      "pred_mortality": 0.098,
+      "pred_icu_mortality": 0.0525,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P42",
+      "pred_mortality": 0.035,
+      "pred_icu_mortality": 0.0305,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P57",
+      "pred_mortality": 0.0497,
+      "pred_icu_mortality": 0.0306,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P34",
+      "pred_mortality": 0.0197,
+      "pred_icu_mortality": 0.0175,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P16",
+      "pred_mortality": 0.2121,
+      "pred_icu_mortality": 0.0937,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    },
+    {
+      "id": "P32",
+      "pred_mortality": 0.003,
+      "pred_icu_mortality": 0.0023,
+      "true_hospital_expired": false,
+      "true_icu_expired": false
+    }
+  ],
+  "links": [
+    {
+      "source": "P17",
+      "target": "P43",
+      "weight": 0.7797,
+      "mutual": true
+    },
+    {
+      "source": "P17",
+      "target": "P35",
+      "weight": 0.6224,
+      "mutual": true
+    },
+    {
+      "source": "P17",
+      "target": "P58",
+      "weight": 0.6084,
+      "mutual": true
+    },
+    {
+      "source": "P28",
+      "target": "P24",
+      "weight": 0.7711,
+      "mutual": true
+    },
+    {
+      "source": "P28",
+      "target": "P7",
+      "weight": 0.4651,
+      "mutual": false
+    },
+    {
+      "source": "P28",
+      "target": "P31",
+      "weight": 0.4395,
+      "mutual": false
+    },
+    {
+      "source": "P21",
+      "target": "P37",
+      "weight": 0.5842,
+      "mutual": true
+    },
+    {
+      "source": "P21",
+      "target": "P12",
+      "weight": 0.5517,
+      "mutual": true
+    },
+    {
+      "source": "P21",
+      "target": "P24",
+      "weight": 0.2532,
+      "mutual": false
+    },
+    {
+      "source": "P9",
+      "target": "P7",
+      "weight": 0.8193,
+      "mutual": true
+    },
+    {
+      "source": "P9",
+      "target": "P44",
+      "weight": 0.716,
+      "mutual": true
+    },
+    {
+      "source": "P9",
+      "target": "P52",
+      "weight": 0.709,
+      "mutual": true
+    },
+    {
+      "source": "P43",
+      "target": "P35",
+      "weight": 0.8058,
+      "mutual": true
+    },
+    {
+      "source": "P43",
+      "target": "P3",
+      "weight": 0.6699,
+      "mutual": true
+    },
+    {
+      "source": "P35",
+      "target": "P3",
+      "weight": 0.6941,
+      "mutual": true
+    },
+    {
+      "source": "P52",
+      "target": "P44",
+      "weight": 0.7805,
+      "mutual": true
+    },
+    {
+      "source": "P52",
+      "target": "P7",
+      "weight": 0.5871,
+      "mutual": true
+    },
+    {
+      "source": "P5",
+      "target": "P2",
+      "weight": 0.6311,
+      "mutual": true
+    },
+    {
+      "source": "P5",
+      "target": "P36",
+      "weight": 0.3569,
+      "mutual": false
+    },
+    {
+      "source": "P5",
+      "target": "P22",
+      "weight": 0.2659,
+      "mutual": false
+    },
+    {
+      "source": "P53",
+      "target": "P1",
+      "weight": 0.6107,
+      "mutual": true
+    },
+    {
+      "source": "P53",
+      "target": "P49",
+      "weight": 0.5345,
+      "mutual": true
+    },
+    {
+      "source": "P35",
+      "target": "P53",
+      "weight": 0.4123,
+      "mutual": false
+    },
+    {
+      "source": "P58",
+      "target": "P11",
+      "weight": 0.6513,
+      "mutual": true
+    },
+    {
+      "source": "P58",
+      "target": "P20",
+      "weight": 0.6437,
+      "mutual": true
+    },
+    {
+      "source": "P17",
+      "target": "P11",
+      "weight": 0.5895,
+      "mutual": false
+    },
+    {
+      "source": "P43",
+      "target": "P11",
+      "weight": 0.491,
+      "mutual": false
+    },
+    {
+      "source": "P3",
+      "target": "P37",
+      "weight": 0.8108,
+      "mutual": true
+    },
+    {
+      "source": "P45",
+      "target": "P19",
+      "weight": 0.6139,
+      "mutual": true
+    },
+    {
+      "source": "P45",
+      "target": "P55",
+      "weight": 0.5876,
+      "mutual": true
+    },
+    {
+      "source": "P45",
+      "target": "P31",
+      "weight": 0.5842,
+      "mutual": false
+    },
+    {
+      "source": "P24",
+      "target": "P18",
+      "weight": 0.6888,
+      "mutual": true
+    },
+    {
+      "source": "P24",
+      "target": "P31",
+      "weight": 0.62,
+      "mutual": true
+    },
+    {
+      "source": "P25",
+      "target": "P20",
+      "weight": 0.7187,
+      "mutual": true
+    },
+    {
+      "source": "P35",
+      "target": "P25",
+      "weight": 0.5223,
+      "mutual": false
+    },
+    {
+      "source": "P58",
+      "target": "P25",
+      "weight": 0.5091,
+      "mutual": false
+    },
+    {
+      "source": "P44",
+      "target": "P7",
+      "weight": 0.778,
+      "mutual": true
+    },
+    {
+      "source": "P12",
+      "target": "P31",
+      "weight": 0.5989,
+      "mutual": true
+    },
+    {
+      "source": "P11",
+      "target": "P12",
+      "weight": 0.4174,
+      "mutual": false
+    },
+    {
+      "source": "P36",
+      "target": "P31",
+      "weight": 0.567,
+      "mutual": false
+    },
+    {
+      "source": "P36",
+      "target": "P18",
+      "weight": 0.4161,
+      "mutual": false
+    },
+    {
+      "source": "P3",
+      "target": "P36",
+      "weight": 0.3804,
+      "mutual": false
+    },
+    {
+      "source": "P9",
+      "target": "P31",
+      "weight": 0.5858,
+      "mutual": false
+    },
+    {
+      "source": "P19",
+      "target": "P55",
+      "weight": 0.5075,
+      "mutual": true
+    },
+    {
+      "source": "P19",
+      "target": "P29",
+      "weight": 0.4988,
+      "mutual": true
+    },
+    {
+      "source": "P55",
+      "target": "P22",
+      "weight": 0.621,
+      "mutual": true
+    },
+    {
+      "source": "P52",
+      "target": "P4",
+      "weight": 0.5315,
+      "mutual": false
+    },
+    {
+      "source": "P25",
+      "target": "P4",
+      "weight": 0.4543,
+      "mutual": false
+    },
+    {
+      "source": "P4",
+      "target": "P20",
+      "weight": 0.4318,
+      "mutual": false
+    },
+    {
+      "source": "P2",
+      "target": "P22",
+      "weight": 0.5315,
+      "mutual": true
+    },
+    {
+      "source": "P3",
+      "target": "P2",
+      "weight": 0.4671,
+      "mutual": false
+    },
+    {
+      "source": "P56",
+      "target": "P1",
+      "weight": 0.498,
+      "mutual": false
+    },
+    {
+      "source": "P56",
+      "target": "P29",
+      "weight": 0.4976,
+      "mutual": true
+    },
+    {
+      "source": "P56",
+      "target": "P22",
+      "weight": 0.4898,
+      "mutual": true
+    },
+    {
+      "source": "P18",
+      "target": "P1",
+      "weight": 0.7269,
+      "mutual": true
+    },
+    {
+      "source": "P18",
+      "target": "P37",
+      "weight": 0.5639,
+      "mutual": true
+    },
+    {
+      "source": "P3",
+      "target": "P1",
+      "weight": 0.5628,
+      "mutual": false
+    },
+    {
+      "source": "P29",
+      "target": "P7",
+      "weight": 0.4947,
+      "mutual": false
+    },
+    {
+      "source": "P20",
+      "target": "P49",
+      "weight": 0.4737,
+      "mutual": true
+    },
+    {
+      "source": "P25",
+      "target": "P49",
+      "weight": 0.4611,
+      "mutual": false
+    },
+    {
+      "source": "P23",
+      "target": "P60",
+      "weight": 0.7613,
+      "mutual": true
+    },
+    {
+      "source": "P23",
+      "target": "P32",
+      "weight": 0.6033,
+      "mutual": true
+    },
+    {
+      "source": "P23",
+      "target": "P8",
+      "weight": 0.5613,
+      "mutual": false
+    },
+    {
+      "source": "P27",
+      "target": "P46",
+      "weight": 0.4364,
+      "mutual": true
+    },
+    {
+      "source": "P27",
+      "target": "P48",
+      "weight": 0.4154,
+      "mutual": false
+    },
+    {
+      "source": "P27",
+      "target": "P50",
+      "weight": 0.3847,
+      "mutual": false
+    },
+    {
+      "source": "P38",
+      "target": "P51",
+      "weight": 0.711,
+      "mutual": true
+    },
+    {
+      "source": "P38",
+      "target": "P34",
+      "weight": 0.3975,
+      "mutual": false
+    },
+    {
+      "source": "P38",
+      "target": "P6",
+      "weight": 0.3793,
+      "mutual": false
+    },
+    {
+      "source": "P47",
+      "target": "P30",
+      "weight": 0.5512,
+      "mutual": true
+    },
+    {
+      "source": "P47",
+      "target": "P16",
+      "weight": 0.4869,
+      "mutual": true
+    },
+    {
+      "source": "P47",
+      "target": "P46",
+      "weight": 0.4303,
+      "mutual": true
+    },
+    {
+      "source": "P59",
+      "target": "P13",
+      "weight": 0.5705,
+      "mutual": true
+    },
+    {
+      "source": "P59",
+      "target": "P26",
+      "weight": 0.4929,
+      "mutual": true
+    },
+    {
+      "source": "P59",
+      "target": "P51",
+      "weight": 0.3994,
+      "mutual": true
+    },
+    {
+      "source": "P33",
+      "target": "P57",
+      "weight": 0.5827,
+      "mutual": true
+    },
+    {
+      "source": "P33",
+      "target": "P10",
+      "weight": 0.5472,
+      "mutual": true
+    },
+    {
+      "source": "P33",
+      "target": "P15",
+      "weight": 0.3743,
+      "mutual": true
+    },
+    {
+      "source": "P26",
+      "target": "P39",
+      "weight": 0.542,
+      "mutual": true
+    },
+    {
+      "source": "P26",
+      "target": "P13",
+      "weight": 0.5033,
+      "mutual": true
+    },
+    {
+      "source": "P54",
+      "target": "P8",
+      "weight": 0.4683,
+      "mutual": false
+    },
+    {
+      "source": "P47",
+      "target": "P54",
+      "weight": 0.4008,
+      "mutual": false
+    },
+    {
+      "source": "P54",
+      "target": "P41",
+      "weight": 0.3924,
+      "mutual": true
+    },
+    {
+      "source": "P10",
+      "target": "P15",
+      "weight": 0.7238,
+      "mutual": true
+    },
+    {
+      "source": "P10",
+      "target": "P57",
+      "weight": 0.3923,
+      "mutual": true
+    },
+    {
+      "source": "P39",
+      "target": "P48",
+      "weight": 0.5572,
+      "mutual": true
+    },
+    {
+      "source": "P39",
+      "target": "P40",
+      "weight": 0.3702,
+      "mutual": true
+    },
+    {
+      "source": "P48",
+      "target": "P41",
+      "weight": 0.6895,
+      "mutual": true
+    },
+    {
+      "source": "P48",
+      "target": "P50",
+      "weight": 0.4813,
+      "mutual": true
+    },
+    {
+      "source": "P51",
+      "target": "P40",
+      "weight": 0.4188,
+      "mutual": true
+    },
+    {
+      "source": "P41",
+      "target": "P50",
+      "weight": 0.411,
+      "mutual": false
+    },
+    {
+      "source": "P14",
+      "target": "P34",
+      "weight": 0.538,
+      "mutual": false
+    },
+    {
+      "source": "P14",
+      "target": "P50",
+      "weight": 0.4179,
+      "mutual": true
+    },
+    {
+      "source": "P14",
+      "target": "P6",
+      "weight": 0.3442,
+      "mutual": false
+    },
+    {
+      "source": "P13",
+      "target": "P32",
+      "weight": 0.4041,
+      "mutual": false
+    },
+    {
+      "source": "P8",
+      "target": "P6",
+      "weight": 0.7425,
+      "mutual": true
+    },
+    {
+      "source": "P8",
+      "target": "P34",
+      "weight": 0.7239,
+      "mutual": true
+    },
+    {
+      "source": "P8",
+      "target": "P32",
+      "weight": 0.5786,
+      "mutual": false
+    },
+    {
+      "source": "P48",
+      "target": "P46",
+      "weight": 0.3792,
+      "mutual": false
+    },
+    {
+      "source": "P40",
+      "target": "P6",
+      "weight": 0.3696,
+      "mutual": false
+    },
+    {
+      "source": "P60",
+      "target": "P30",
+      "weight": 0.5693,
+      "mutual": true
+    },
+    {
+      "source": "P60",
+      "target": "P32",
+      "weight": 0.5684,
+      "mutual": false
+    },
+    {
+      "source": "P6",
+      "target": "P34",
+      "weight": 0.7948,
+      "mutual": true
+    },
+    {
+      "source": "P23",
+      "target": "P6",
+      "weight": 0.5298,
+      "mutual": false
+    },
+    {
+      "source": "P50",
+      "target": "P30",
+      "weight": 0.5549,
+      "mutual": true
+    },
+    {
+      "source": "P15",
+      "target": "P57",
+      "weight": 0.3586,
+      "mutual": false
+    },
+    {
+      "source": "P42",
+      "target": "P57",
+      "weight": 0.5309,
+      "mutual": true
+    },
+    {
+      "source": "P30",
+      "target": "P42",
+      "weight": 0.4298,
+      "mutual": false
+    },
+    {
+      "source": "P42",
+      "target": "P32",
+      "weight": 0.4231,
+      "mutual": false
+    },
+    {
+      "source": "P34",
+      "target": "P32",
+      "weight": 0.5938,
+      "mutual": true
+    },
+    {
+      "source": "P16",
+      "target": "P32",
+      "weight": 0.7085,
+      "mutual": true
+    },
+    {
+      "source": "P8",
+      "target": "P16",
+      "weight": 0.4786,
+      "mutual": false
+    }
+  ]
+}
