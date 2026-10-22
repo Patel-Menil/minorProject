@@ -1,0 +1,29 @@
+{
+  "Local-Only Model (No Fed)": {
+    "loss": 0.9986,
+    "mort_auroc": 0.5636,
+    "mort_auprc": 0.0956,
+    "mort_f1": 0.0035,
+    "seps_auroc": 0.4772,
+    "seps_auprc": 0.0454,
+    "seps_f1": 0.0
+  },
+  "Multimodal No-GNN Ablation": {
+    "loss": 0.8076,
+    "mort_auroc": 0.6768,
+    "mort_auprc": 0.2867,
+    "mort_f1": 0.2455,
+    "seps_auroc": 0.7889,
+    "seps_auprc": 0.3326,
+    "seps_f1": 0.317
+  },
+  "Federated Graph Model (Proposed)": {
+    "loss": 0.8404,
+    "mort_auroc": 0.5672,
+    "mort_auprc": 0.0998,
+    "mort_f1": 0.0018,
+    "seps_auroc": 0.5526,
+    "seps_auprc": 0.0578,
+    "seps_f1": 0.0
+  }
+}

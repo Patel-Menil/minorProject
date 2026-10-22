@@ -7,7 +7,7 @@
 *Privacy-preserving, multi-hospital, multimodal, graph-enhanced clinical prediction*
 
 ![Federated Learning](https://img.shields.io/badge/Learning-Federated-blue)
-![Modalities](https://img.shields.io/badge/Modalities-Time--series%20%7C%20Tabular%20%7C%20Text-teal)
+![Modalities](https://img.shields.io/badge/Modalities-Time--series%20%7C%20Tabular-teal)
 ![Model](https://img.shields.io/badge/Model-GNN-orange)
 ![Tasks](https://img.shields.io/badge/Tasks-Mortality%20%2B%20Sepsis-red)
 ![Dataset](https://img.shields.io/badge/Dataset-eICU-lightgrey)
@@ -49,10 +49,9 @@ Design a **federated learning framework** that predicts **in-hospital mortality*
 | Component | Choice |
 |---|---|
 | **Federated client** | One hospital (identified by `hospitalid` in eICU) |
-| **Modalities** | Time-series · Tabular · Unstructured text |
+| **Modalities** | Time-series · Tabular |
 | **Time-series encoder** | LSTM *(GRU / Transformer in future versions)* |
 | **Tabular encoder** | Autoencoder *(or MLP)* |
-| **Text encoder** | MiniBERT *(or ClinicalBERT if available)* |
 | **Fusion** | Concatenation *(attention / gated fusion later)* |
 | **Patient graph** | k-NN or thresholded cosine similarity, **within** each hospital |
 | **Graph model** | GraphSAGE, GAT, or GCN |
@@ -67,13 +66,12 @@ Design a **federated learning framework** that predicts **in-hospital mortality*
 For each hospital (identified using the `hospitalid` field in the eICU dataset):
 
 1. Collect all patients belonging to that hospital.
-2. Divide the patient data into **three modalities**:
+2. Divide the patient data into **two modalities**:
 
 | Modality | Contents |
 |---|---|
 | ⏱️ **Time-series data** | Vital signs, laboratory measurements, physiological signals collected over time |
 | 📋 **Tabular data** | Demographics, admission information, diagnosis codes, severity scores, etc. |
-| 📝 **Unstructured data** | Clinical notes (if available) or other free-text information |
 
 > 🔒 **Each hospital performs all preprocessing locally.**
 
@@ -87,19 +85,18 @@ Each modality is processed using a **separate encoder**, and each encoder learns
 |---|---|---|---|
 | ⏱️ **Time-series** | LSTM *(or GRU / Transformer in future versions)* | Sequential physiological measurements | Temporal embedding for each patient |
 | 📋 **Tabular** | Autoencoder *(or an MLP)* | Structured clinical variables | Latent tabular embedding |
-| 📝 **Text** | MiniBERT *(or ClinicalBERT if available)* | Clinical notes | Text embedding |
 
 ---
 
 ## Step 3 — Multimodal Fusion
 
-The embeddings from the three encoders are combined to obtain a **unified patient representation**. Initially, simple **concatenation** can be used.
+The embeddings from the two encoders are combined to obtain a **unified patient representation**. Initially, simple **concatenation** can be used.
 
 ```text
-Time-series Embedding  +  Tabular Embedding  +  Text Embedding
-                              │
-                              ▼
-                  Unified Patient Embedding
+Time-series Embedding  +  Tabular Embedding
+                      │
+                      ▼
+          Unified Patient Embedding
 ```
 
 > 💡 An **attention-based** or **gated fusion** module can later replace simple concatenation.
@@ -181,10 +178,8 @@ flowchart TD
         A["Patient Data"] --> B["Separate by Modality"]
         B --> C1["LSTM<br/>Time-series"]
         B --> C2["Autoencoder<br/>Tabular"]
-        B --> C3["MiniBERT<br/>Text"]
         C1 --> D["Fusion"]
         C2 --> D
-        C3 --> D
         D --> E["Unified Patient Embeddings"]
         E --> F["Patient Similarity Graph"]
         F --> G["Graph Neural Network"]
@@ -210,14 +205,14 @@ The implementation should include:
 
 ### Core implementation
 
-- [ ] Data preprocessing pipeline
-- [ ] Three modality-specific encoders
-- [ ] Multimodal fusion module
-- [ ] Patient graph construction algorithm
-- [ ] Graph Neural Network implementation
-- [ ] Multi-task prediction module
-- [ ] Federated learning pipeline
-- [ ] Training and evaluation scripts
+- [x] Data preprocessing pipeline
+- [x] Two modality-specific encoders (Tabular & Time-series)
+- [x] Multimodal fusion module
+- [x] Patient graph construction algorithm
+- [x] Graph Neural Network implementation
+- [x] Multi-task prediction module
+- [x] Federated learning pipeline
+- [x] Training and evaluation scripts
 
 ### Baseline comparisons
 

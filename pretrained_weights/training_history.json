@@ -1,0 +1,62 @@
+[
+  {
+    "round": 1,
+    "clients": 6,
+    "patients": 2381,
+    "val_loss": 1.1308,
+    "mort_auroc": 0.5803,
+    "mort_auprc": 0.0952,
+    "mort_f1": 0.0,
+    "seps_auroc": 0.6713,
+    "seps_auprc": 0.1176,
+    "seps_f1": 0.0
+  },
+  {
+    "round": 2,
+    "clients": 6,
+    "patients": 7225,
+    "val_loss": 0.9773,
+    "mort_auroc": 0.4806,
+    "mort_auprc": 0.0792,
+    "mort_f1": 0.0,
+    "seps_auroc": 0.5837,
+    "seps_auprc": 0.0764,
+    "seps_f1": 0.0
+  },
+  {
+    "round": 3,
+    "clients": 6,
+    "patients": 3080,
+    "val_loss": 0.9213,
+    "mort_auroc": 0.4967,
+    "mort_auprc": 0.078,
+    "mort_f1": 0.0,
+    "seps_auroc": 0.5646,
+    "seps_auprc": 0.0648,
+    "seps_f1": 0.004
+  },
+  {
+    "round": 4,
+    "clients": 6,
+    "patients": 4278,
+    "val_loss": 0.8845,
+    "mort_auroc": 0.512,
+    "mort_auprc": 0.0912,
+    "mort_f1": 0.0024,
+    "seps_auroc": 0.4862,
+    "seps_auprc": 0.0511,
+    "seps_f1": 0.0
+  },
+  {
+    "round": 5,
+    "clients": 6,
+    "patients": 3880,
+    "val_loss": 0.9288,
+    "mort_auroc": 0.5321,
+    "mort_auprc": 0.1182,
+    "mort_f1": 0.0256,
+    "seps_auroc": 0.5523,
+    "seps_auprc": 0.0758,
+    "seps_f1": 0.0151
+  }
+]

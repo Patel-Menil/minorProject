@@ -35,10 +35,11 @@ from src.encoders import TabularAutoencoder
 # ═══════════════════════════════════════════════════════════════════════════
 #  Configuration
 # ═══════════════════════════════════════════════════════════════════════════
-PROCESSED_DIR = pathlib.Path(r"c:\minorProject\processed")
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+PROCESSED_DIR = PROJECT_ROOT / "processed"
 HOSPITALS_DIR = PROCESSED_DIR / "hospitals"
 STATS_PATH = PROCESSED_DIR / "tabular_stats.json"
-OUTPUT_DIR = pathlib.Path(r"c:\minorProject\pretrained_weights")
+OUTPUT_DIR = PROJECT_ROOT / "pretrained_weights"
 
 EMBEDDING_DIM = 64
 DROPOUT = 0.3

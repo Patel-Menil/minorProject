@@ -26,7 +26,8 @@ from src.datasets import (
 from src.encoders import TabularEncoder, TabularAutoencoder, TimeSeriesLSTM
 
 # ── Paths ────────────────────────────────────────────────────────────────
-PROCESSED_DIR = pathlib.Path(r"c:\minorProject\processed")
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+PROCESSED_DIR = PROJECT_ROOT / "processed"
 HOSPITAL_DIR = PROCESSED_DIR / "hospitals" / "hospital_102"
 STATS_PATH = PROCESSED_DIR / "timeseries_stats.json"
 

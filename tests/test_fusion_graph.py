@@ -19,9 +19,10 @@ from src.encoders import TabularEncoder, TimeSeriesLSTM
 from src.fusion import MultimodalFusion
 from src.graph_builder import build_knn_graph, build_threshold_graph
 
-PROCESSED_DIR = pathlib.Path(r"c:\minorProject\processed")
+PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+PROCESSED_DIR = PROJECT_ROOT / "processed"
 HOSPITAL_DIR = PROCESSED_DIR / "hospitals" / "hospital_102"
-STATS_PATH = PROCESSED_DIR / "tabular_stats.json"
+STATS_PATH = PROCESSED_DIR / "timeseries_stats.json"
 
 def main():
     print("=" * 60)

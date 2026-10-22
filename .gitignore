@@ -1,6 +1,6 @@
-# Datasets and model weights (too large for Git and shouldn't be version controlled)
-processed/
-pretrained_weights/
+# Datasets (large clinical data > 100MB cannot be pushed to GitHub)
+processed/hospitals/
+processed/mapping/
 
 # Python
 __pycache__/
@@ -25,13 +25,18 @@ wheels/
 *.egg
 
 # Virtual environments
+.venv/
 venv/
 env/
 ENV/
 env.bak/
 venv.bak/
 
+# Dependencies and build outputs
+node_modules/
+
 # IDEs
 .idea/
 .vscode/
 *.swp
+

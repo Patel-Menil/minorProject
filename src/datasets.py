@@ -56,6 +56,7 @@ class EICUTabularDataset(Dataset):
         self,
         hospital_dir: str | pathlib.Path,
         fit_scaler: bool = True,
+        canonical_features: Optional[list[str] | str | pathlib.Path] = None,
     ) -> None:
         super().__init__()
         hospital_dir = pathlib.Path(hospital_dir)
@@ -68,14 +69,32 @@ class EICUTabularDataset(Dataset):
         # Separate targets
         self.targets = df[TABULAR_TARGET_COLS].values.astype(np.float32)
 
-        # Separate input features (everything except ID + targets)
-        feature_cols = [
-            c
-            for c in df.columns
-            if c != TABULAR_ID_COL and c not in TABULAR_TARGET_COLS
-        ]
-        self.feature_names = feature_cols
-        features = df[feature_cols].values.astype(np.float32)
+        # ── Resolve Canonical Features ──────────────────────────────────
+        if canonical_features is not None:
+            if isinstance(canonical_features, (str, pathlib.Path)):
+                with open(canonical_features, "r") as f:
+                    self.feature_names = json.load(f)
+            else:
+                self.feature_names = list(canonical_features)
+        else:
+            canonical_path = hospital_dir.parent.parent / "canonical_tabular_features.json"
+            if canonical_path.exists():
+                with open(canonical_path, "r") as f:
+                    self.feature_names = json.load(f)
+            else:
+                feature_cols = [
+                    c
+                    for c in df.columns
+                    if c != TABULAR_ID_COL and c not in TABULAR_TARGET_COLS
+                ]
+                self.feature_names = feature_cols
+
+        # Impute missing canonical columns with 0.0
+        for c in self.feature_names:
+            if c not in df.columns:
+                df[c] = 0.0
+
+        features = df[self.feature_names].values.astype(np.float32)
         features = np.nan_to_num(features, nan=0.0, posinf=0.0, neginf=0.0)
 
         # ── Scaling ──────────────────────────────────────────────────────
@@ -136,55 +155,90 @@ class EICUTimeSeriesDataset(Dataset):
     ----------
     hospital_dir : str or pathlib.Path
         Path to `processed/hospitals/hospital_<id>`.
-    stats_path : str or pathlib.Path
+    stats_path : str or pathlib.Path, optional
         Path to `processed/timeseries_stats.json` (global mean/std for labs).
     max_seq_len : int
         Fixed sequence length to pad/truncate to (default: 48 hours).
     tabular_dataset : EICUTabularDataset, optional
         If provided, aligns patient ordering and fetches targets from the
         tabular dataset (so that both datasets share the same patient set).
+    canonical_features : list[str] or str or pathlib.Path, optional
+        Standardized list of canonical time-series feature names. Missing
+        features in this hospital are imputed with 0.0. Defaults to
+        `processed/canonical_timeseries_features.json` if available.
     """
 
     def __init__(
         self,
         hospital_dir: str | pathlib.Path,
-        stats_path: str | pathlib.Path,
+        stats_path: Optional[str | pathlib.Path] = None,
         max_seq_len: int = 48,
         tabular_dataset: Optional[EICUTabularDataset] = None,
+        canonical_features: Optional[list[str] | str | pathlib.Path] = None,
     ) -> None:
         super().__init__()
         hospital_dir = pathlib.Path(hospital_dir)
         parquet_path = hospital_dir / "timeseries" / "timeseries_features.parquet"
         df = pd.read_parquet(parquet_path)
 
-        # ── Load global normalisation stats ──────────────────────────────
-        with open(stats_path, "r") as f:
-            raw_stats = json.load(f)
+        # ── Load global normalisation stats if provided ──────────────────
+        raw_stats = {}
+        if stats_path is not None and pathlib.Path(stats_path).exists():
+            with open(stats_path, "r") as f:
+                raw_stats = json.load(f)
 
-        # ── Identify numeric feature columns ─────────────────────────────
-        feature_cols = [
-            c
-            for c in df.columns
-            if c not in (TIMESERIES_ID_COL, TIMESERIES_TIME_COL)
-            and c not in TIMESERIES_TEXT_COLS
-        ]
-        self.feature_names = feature_cols
+        # ── Resolve Canonical Features ──────────────────────────────────
+        if canonical_features is not None:
+            if isinstance(canonical_features, (str, pathlib.Path)):
+                with open(canonical_features, "r") as f:
+                    self.feature_names = json.load(f)
+            else:
+                self.feature_names = list(canonical_features)
+        else:
+            canonical_path = hospital_dir.parent.parent / "canonical_timeseries_features.json"
+            if canonical_path.exists():
+                with open(canonical_path, "r") as f:
+                    self.feature_names = json.load(f)
+            else:
+                feature_cols = [
+                    c
+                    for c in df.columns
+                    if c not in (TIMESERIES_ID_COL, TIMESERIES_TIME_COL)
+                    and c not in TIMESERIES_TEXT_COLS
+                ]
+                self.feature_names = feature_cols
+
+        # Impute any missing canonical columns with 0.0
+        for c in self.feature_names:
+            if c not in df.columns:
+                df[c] = 0.0
+
+        feature_cols = self.feature_names
         self.num_features = len(feature_cols)
         self.max_seq_len = max_seq_len
 
-        # ── Build per-column mean/std arrays for z-score normalisation ───
-        # The stats file only covers lab columns; infusion/treatment/med
-        # columns are binary or already rate-valued, so we leave them as-is.
+        # ── Z-score normalisation check ──────────────────────────────────
+        # Parquet files are already pre-normalized. If raw unnormalized data
+        # is encountered (detected by max lab values > 50.0), apply raw_stats.
+        apply_normalization = False
+        if raw_stats:
+            for col in feature_cols:
+                base = col.split("_", 1)[1] if "_" in col else col
+                if base in raw_stats and col in df.columns and len(df[col]) > 0:
+                    if df[col].max() > 50.0:
+                        apply_normalization = True
+                        break
+
         col_mean = np.zeros(len(feature_cols), dtype=np.float32)
         col_std = np.ones(len(feature_cols), dtype=np.float32)
-        for i, col_name in enumerate(feature_cols):
-            # Strip the prefix (e.g. "lab_") to match keys in stats JSON
-            base = col_name.split("_", 1)[1] if "_" in col_name else col_name
-            if base in raw_stats:
-                col_mean[i] = raw_stats[base]["mean"]
-                col_std[i] = raw_stats[base]["std"]
-                if col_std[i] < 1e-8:
-                    col_std[i] = 1.0
+        if apply_normalization:
+            for i, col_name in enumerate(feature_cols):
+                base = col_name.split("_", 1)[1] if "_" in col_name else col_name
+                if base in raw_stats:
+                    col_mean[i] = raw_stats[base]["mean"]
+                    col_std[i] = raw_stats[base]["std"]
+                    if col_std[i] < 1e-8:
+                        col_std[i] = 1.0
 
         self._col_mean = col_mean
         self._col_std = col_std
@@ -206,8 +260,9 @@ class EICUTimeSeriesDataset(Dataset):
         for pid, grp in grouped:
             self.patient_ids.append(int(pid))
             seq = grp[feature_cols].values.astype(np.float32)
-            # Normalise lab columns (others pass through since std=1, mean=0)
-            seq = (seq - col_mean) / col_std
+            seq = np.nan_to_num(seq, nan=0.0, posinf=0.0, neginf=0.0)
+            if apply_normalization:
+                seq = (seq - col_mean) / col_std
             self.sequences.append(seq)
             self.lengths.append(min(len(seq), max_seq_len))
 
