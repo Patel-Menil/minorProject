@@ -37,7 +37,7 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from src.datasets import load_hospital_dataset
+from src.datasets import OBS_HOURS, load_hospital_dataset
 from src.graph_builder import build_knn_graph
 from src.models import FederatedPatientModel
 from src.splits import load_or_create_split
@@ -48,7 +48,7 @@ HOSPITALS_DIR = PROCESSED_DIR / "hospitals"
 STATS_PATH = PROCESSED_DIR / "timeseries_stats.json"
 SPLIT_PATH = PROCESSED_DIR / "hospital_split.json"
 PUBLIC_DIR = PROJECT_ROOT / "frontend-playground" / "public"
-CHECKPOINT = PROJECT_ROOT / "results" / "corrected" / "global_federated_model.pth"
+CHECKPOINT = PROJECT_ROOT / "results" / "corrected" / "fedavg_gnn" / "seed42" / "global_federated_model.pth"
 BATCH_SIZE = 32  # same batching as src/evaluation.py, so these are the evaluated predictions
 
 
@@ -90,6 +90,8 @@ def real_graph(hospital: str, checkpoint: pathlib.Path) -> dict:
 
     ckpt = torch.load(checkpoint, map_location="cpu")
     check_checkpoint(ckpt["model_state_dict"])
+    if not ckpt.get("use_gnn", True):
+        raise ValueError("This is a No-GNN checkpoint; the graph viewer needs a GNN model (fedavg_gnn)")
     model = FederatedPatientModel(
         tabular_input_dim=ckpt["tabular_dim"],
         timeseries_input_dim=ckpt["timeseries_dim"],
@@ -99,7 +101,7 @@ def real_graph(hospital: str, checkpoint: pathlib.Path) -> dict:
     model.load_state_dict(ckpt["model_state_dict"])
     model.eval()  # no dropout, BatchNorm uses learned running statistics
 
-    ds = load_hospital_dataset(HOSPITALS_DIR / hospital, STATS_PATH, max_seq_len=48)
+    ds = load_hospital_dataset(HOSPITALS_DIR / hospital, STATS_PATH)
     labels = anonymous_labels(len(ds))
     pred_mort, pred_icu, true_rows, edges, weights = [], [], [], [], []
     offset = 0
@@ -125,7 +127,7 @@ def real_graph(hospital: str, checkpoint: pathlib.Path) -> dict:
     ]
     meta = {
         "source": "model",
-        "description": "Predictions of the trained federated model (eval mode) on a held-out test hospital.",
+        "description": f"Predictions of the trained federated model (eval mode) on a held-out test hospital, made from the first {OBS_HOURS} h of each ICU stay.",
         "hospital": hospital,
         "split": "test",
         "checkpoint": checkpoint.name,

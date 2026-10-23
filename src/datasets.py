@@ -33,6 +33,13 @@ TIMESERIES_TEXT_COLS = [
 ]
 TIMESERIES_ID_COL = "patientunitstayid"
 TIMESERIES_TIME_COL = "hour_bin"
+# hour_bin counts 4-hour blocks since ICU admission (checked: last bin ~ ICU stay hours / 4)
+HOUR_BIN_HOURS = 4
+
+# Early-prediction setup: inputs come from the first OBS_HOURS of the ICU stay,
+# and only patients still in the ICU at OBS_HOURS are predicted, so the input
+# window never contains the outcome itself.
+OBS_HOURS = 24
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -57,11 +64,14 @@ class EICUTabularDataset(Dataset):
         hospital_dir: str | pathlib.Path,
         fit_scaler: bool = True,
         canonical_features: Optional[list[str] | str | pathlib.Path] = None,
+        min_stay_hours: float = 0,
     ) -> None:
         super().__init__()
         hospital_dir = pathlib.Path(hospital_dir)
         parquet_path = hospital_dir / "tabular" / "tabular_features.parquet"
         df = pd.read_parquet(parquet_path)
+        # Keep only patients still in the ICU after min_stay_hours (offset is in minutes)
+        df = df[df["unitdischargeoffset"] >= min_stay_hours * 60].reset_index(drop=True)
 
         # Store patient IDs for later reference (graph construction, etc.)
         self.patient_ids = df[TABULAR_ID_COL].values.copy()
@@ -147,7 +157,7 @@ class EICUTimeSeriesDataset(Dataset):
     """
     Loads the `timeseries_features.parquet` for one hospital.
 
-    Each patient has a variable number of hourly time-steps.
+    Each patient has a variable number of 4-hour time-steps (hour_bin).
     Sequences are padded/truncated to `max_seq_len` and original lengths
     are returned so that downstream code can use `pack_padded_sequence`.
 
@@ -158,7 +168,9 @@ class EICUTimeSeriesDataset(Dataset):
     stats_path : str or pathlib.Path, optional
         Path to `processed/timeseries_stats.json` (global mean/std for labs).
     max_seq_len : int
-        Fixed sequence length to pad/truncate to (default: 48 hours).
+        Fixed sequence length (in 4-hour bins) to pad/truncate to.
+    obs_hours : float, optional
+        If given, only time-steps from the first `obs_hours` of the ICU stay are kept.
     tabular_dataset : EICUTabularDataset, optional
         If provided, aligns patient ordering and fetches targets from the
         tabular dataset (so that both datasets share the same patient set).
@@ -175,11 +187,14 @@ class EICUTimeSeriesDataset(Dataset):
         max_seq_len: int = 48,
         tabular_dataset: Optional[EICUTabularDataset] = None,
         canonical_features: Optional[list[str] | str | pathlib.Path] = None,
+        obs_hours: Optional[float] = None,
     ) -> None:
         super().__init__()
         hospital_dir = pathlib.Path(hospital_dir)
         parquet_path = hospital_dir / "timeseries" / "timeseries_features.parquet"
         df = pd.read_parquet(parquet_path)
+        if obs_hours is not None:
+            df = df[df[TIMESERIES_TIME_COL] < obs_hours / HOUR_BIN_HOURS]
 
         # ── Load global normalisation stats if provided ──────────────────
         raw_stats = {}
@@ -383,12 +398,20 @@ class EICUMultimodalDataset(Dataset):
 def load_hospital_dataset(
     hospital_dir: str | pathlib.Path,
     stats_path: Optional[str | pathlib.Path] = None,
-    max_seq_len: int = 48,
+    obs_hours: float = OBS_HOURS,
 ) -> EICUMultimodalDataset:
-    """Loads one hospital's tabular + time-series data, paired by patient ID."""
-    tab_ds = EICUTabularDataset(hospital_dir, fit_scaler=True)
+    """
+    Loads one hospital's tabular + time-series data, paired by patient ID,
+    for early prediction: patients still in the ICU at `obs_hours`, with
+    time-series from the first `obs_hours` only (6 bins of 4 hours for 24 h).
+    """
+    tab_ds = EICUTabularDataset(hospital_dir, fit_scaler=True, min_stay_hours=obs_hours)
     ts_ds = EICUTimeSeriesDataset(
-        hospital_dir, stats_path=stats_path, max_seq_len=max_seq_len, tabular_dataset=tab_ds
+        hospital_dir,
+        stats_path=stats_path,
+        max_seq_len=int(obs_hours // HOUR_BIN_HOURS),
+        tabular_dataset=tab_ds,
+        obs_hours=obs_hours,
     )
     return EICUMultimodalDataset(tab_ds, ts_ds)
 

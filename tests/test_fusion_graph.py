@@ -30,7 +30,7 @@ def main():
     print("=" * 60)
 
     # 1. Load Data
-    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH, max_seq_len=48)
+    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH)
     features, seqs, lens, _, pids = next(iter(DataLoader(ds, batch_size=16, shuffle=False)))
 
     # 2. Encoders (Step 2)

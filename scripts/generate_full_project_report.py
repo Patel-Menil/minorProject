@@ -12,14 +12,17 @@ Formatting Rules Enforced:
 - Sub-Sub-Heading: 13 pt, Bold
 - Body Text: 12 pt, Justified, 1.15 line spacing, 6 pt after
 - Captions: 11 pt (Table caption ABOVE table, Figure caption BELOW figure)
-- References: 10 pt, IEEE Format [1] - [26]
+- References: 10 pt, IEEE Format [1] - [25]
 - Margins: 1 inch (72 pt) all sides
 - Page Numbers: Roman (i-xii) for front matter, Arabic (1-N) for chapters
 - Headers/Footers: Institution name centered in header, page number centered in footer
 """
 
+import glob
+import json
 import os
 import pathlib
+import statistics
 import docx
 from docx.shared import Inches, Pt, RGBColor, Cm, Emu
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -29,9 +32,31 @@ from docx.oxml import OxmlElement, parse_xml
 from docx.oxml.ns import nsdecls, qn
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
-ASSETS_DIR = PROJECT_ROOT / "report_assets"
-DOCX_OUT_PATH = PROJECT_ROOT / "BTech_Project_Report_Final_2026.docx"
-PDF_OUT_PATH = PROJECT_ROOT / "BTech_Project_Report_Final_2026.pdf"
+# Corrected report: new figures and a new file name, so the original report is kept
+ASSETS_DIR = PROJECT_ROOT / "report_assets" / "corrected"
+DOCX_OUT_PATH = PROJECT_ROOT / "BTech_Project_Report_Corrected_2026.docx"
+
+# The second prediction target is ICU mortality (icu_expired), not sepsis.
+# If the department requires the originally registered title, change it here only.
+TITLE = "Federated Multimodal Graph Learning Framework for In-Hospital and ICU Mortality Prediction"
+TITLE_UPPER = TITLE.upper()
+RESULTS_DIR = PROJECT_ROOT / "results" / "corrected"
+
+
+def load_benchmark_summary():
+    with open(RESULTS_DIR / "benchmark_results.json") as f:
+        return json.load(f)["summary"]
+
+
+def gnn_convergence(rounds):
+    """Mean over seeds of fedavg_gnn validation metrics at the given rounds."""
+    hists = [json.load(open(p)) for p in sorted(glob.glob(str(RESULTS_DIR / "fedavg_gnn" / "seed*" / "training_history.json")))]
+    out = []
+    for rnd in rounds:
+        m = lambda key: statistics.mean(h[rnd - 1][key] for h in hists)
+        out.append((f"Round {rnd}", f"{m('val_loss'):.4f}", f"{m('mort_auroc'):.4f}",
+                    f"{m('mort_auprc'):.4f}", f"{m('icu_auroc'):.4f}"))
+    return out, len(hists)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # UTILITY FUNCTIONS
@@ -283,6 +308,27 @@ def add_page_header(section, text):
     run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
 
 
+def add_page_number_footer(section):
+    """Centered 'Page N' footer using a live Word PAGE field (continuous numbering)."""
+    footer = section.footer
+    footer.is_linked_to_previous = False
+    p = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    for text in ("Page ",):
+        r = p.add_run(text)
+        r.font.name = "Times New Roman"
+        r.font.size = Pt(9)
+        r.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+    run = p.add_run()
+    run.font.name = "Times New Roman"
+    run.font.size = Pt(9)
+    run.font.color.rgb = RGBColor(0x66, 0x66, 0x66)
+    begin = OxmlElement('w:fldChar'); begin.set(qn('w:fldCharType'), 'begin')
+    instr = OxmlElement('w:instrText'); instr.set(qn('xml:space'), 'preserve'); instr.text = 'PAGE'
+    end = OxmlElement('w:fldChar'); end.set(qn('w:fldCharType'), 'end')
+    run._r.append(begin); run._r.append(instr); run._r.append(end)
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # MAIN REPORT BUILDER
 # ─────────────────────────────────────────────────────────────────────────────
@@ -303,6 +349,9 @@ def build_report():
         sec.bottom_margin = Inches(1.0)
         sec.left_margin = Inches(1.0)
         sec.right_margin = Inches(1.0)
+        # Institute name in the header, continuous page number in the footer
+        add_page_header(sec, "Indian Institute of Information Technology, Bhopal")
+        add_page_number_footer(sec)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 1. TITLE PAGE
@@ -327,7 +376,7 @@ def build_report():
     add_para(doc, "(Phase – II)",
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=13, space_after=20)
     
-    add_para(doc, "FEDERATED MULTIMODAL GRAPH LEARNING\nFRAMEWORK FOR IN-HOSPITAL MORTALITY\nAND SEPSIS PREDICTION",
+    add_para(doc, "FEDERATED MULTIMODAL GRAPH LEARNING\nFRAMEWORK FOR IN-HOSPITAL AND\nICU MORTALITY PREDICTION",
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=17, space_after=24,
              line_spacing=1.3)
     
@@ -413,7 +462,7 @@ def build_report():
 
     cert_text = (
         "This is to certify that the work embodied in this project report entitled "
-        "\u201cFEDERATED MULTIMODAL GRAPH LEARNING FRAMEWORK FOR IN-HOSPITAL MORTALITY AND SEPSIS PREDICTION\u201d "
+        f"\u201c{TITLE_UPPER}\u201d "
         "has been satisfactorily completed by the following students of the Department of Computer Science and Engineering, "
         "Indian Institute of Information Technology, Bhopal:"
     )
@@ -473,8 +522,8 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=20)
 
     decl_text = (
-        "We hereby declare that the major project report entitled \u201cFEDERATED MULTIMODAL GRAPH LEARNING "
-        "FRAMEWORK FOR IN-HOSPITAL MORTALITY AND SEPSIS PREDICTION\u201d submitted herein is a genuine record "
+        f"We hereby declare that the major project report entitled \u201c{TITLE_UPPER}\u201d "
+        "submitted herein is a genuine record "
         "of research and engineering work carried out by us in partial fulfillment of the requirements for "
         "the award of the degree of Bachelor of Technology in Computer Science and Engineering from the "
         "Indian Institute of Information Technology, Bhopal.\n\n"
@@ -516,8 +565,7 @@ def build_report():
     ack_paras = [
         "We would like to express our deepest and most sincere gratitude to everyone who supported, "
         "encouraged, and guided us throughout the successful conceptualization, implementation, and "
-        "completion of our B.Tech major project titled \u201cFederated Multimodal Graph Learning Framework "
-        "for In-Hospital Mortality and Sepsis Prediction.\u201d",
+        f"completion of our B.Tech major project titled \u201c{TITLE}.\u201d",
 
         "First and foremost, we extend our heartfelt gratitude to the esteemed Director, Indian Institute "
         "of Information Technology Bhopal, for providing state-of-the-art computational infrastructure, "
@@ -558,42 +606,48 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     abstract_paras = [
-        "In modern intensive care units (ICUs), rapid and accurate risk stratification for life-threatening "
-        "outcomes such as in-hospital mortality and sepsis is vital for timely clinical intervention and "
+        "In modern intensive care units (ICUs), early and accurate risk stratification for life-threatening "
+        "outcomes such as in-hospital and ICU mortality is vital for timely clinical intervention and "
         "resource allocation. Although machine learning models trained on Electronic Health Records (EHRs) "
         "have shown significant promise, their real-world deployment faces two major structural barriers: "
-        "(1) strict privacy regulations (e.g., HIPAA, GDPR, DPDPA) that prohibit centralizing sensitive "
-        "protected health information across distributed hospital networks, and (2) the failure of "
+        "(1) privacy regulations (e.g., HIPAA, GDPR, DPDPA) that restrict centralizing sensitive "
+        "protected health information across hospital networks, and (2) the failure of "
         "traditional models to exploit relational inductive biases between clinically similar patients "
         "who share acute physiological phenotypes.",
 
-        "To resolve this fundamental tension between clinical privacy and predictive utility, this project "
-        "introduces a novel Federated Multimodal Graph Learning Framework. The architecture operates in a "
-        "strictly decentralized fashion across 207 distinct hospital clients from the multi-center eICU "
-        "Collaborative Research Database. For each hospital, patient records are decomposed into two "
+        "To study this tension between clinical privacy and predictive utility, this project "
+        "implements a Federated Multimodal Graph Learning Framework and evaluates it in a single-machine "
+        "federated simulation on the multi-center eICU Collaborative Research Database (207 hospitals, "
+        "200,826 ICU encounters). Hospitals are split into 145 training, 31 validation and 31 test hospitals. "
+        "The task is early prediction: each model sees only the first 24 hours of an ICU stay and predicts "
+        "in-hospital and ICU mortality for patients still in the ICU at 24 hours (132,878 encounters). "
+        "For each patient, the record is decomposed into two "
         "complementary modalities: (i) static tabular variables (demographics, admission diagnoses, baseline "
         "organ scores) encoded via a multi-layer perceptron into a 64-dimensional latent embedding, and "
-        "(ii) dynamic time-series observations (hourly vital signs, laboratory tests, and intravenous "
-        "medication infusion rates) modeled via a 2-layer Long Short-Term Memory (LSTM) network with packed "
+        "(ii) time-series observations in 4-hour bins (laboratory tests, infusion rates, medications and "
+        "treatments) modeled via a 2-layer Long Short-Term Memory (LSTM) network with packed "
         "sequence handling into a 64-dimensional temporal embedding. A multimodal fusion layer projects "
         "the concatenated representations into a 128-dimensional unified patient space.",
 
-        "Within each hospital client, an intra-hospital patient similarity graph is dynamically constructed "
-        "via k-nearest neighbors (k=5) using cosine metric distances. Cross-hospital edges are mathematically "
-        "forbidden, enforcing strict local privacy. A Graph Neural Network (PatientGNN) leveraging GraphSAGE, "
+        "Within each hospital client, a patient similarity graph is built for every training batch "
+        "via k-nearest neighbors (k=5) using cosine similarity, so edges only connect patients of the same "
+        "hospital. A Graph Neural Network (PatientGNN) leveraging GraphSAGE, "
         "Graph Attention Networks (GAT), or Graph Convolutional Networks (GCN) propagates neighborhood clinical "
         "signals, capturing phenotypic correlations among acute patients. Attached dual multi-task prediction "
-        "heads simultaneously predict In-Hospital Mortality and Sepsis/ICU Mortality using a positive-class "
-        "weighted multi-task loss function. A central parameter server aggregates local model updates via "
-        "sample-weighted Federated Averaging (FedAvg), preserving complete data locality while collaboratively "
-        "optimizing a shared global model.",
+        "heads simultaneously predict In-Hospital Mortality and ICU Mortality using a positive-class "
+        "weighted multi-task loss function. A central server aggregates local model weights via "
+        "Federated Averaging (FedAvg), weighted by the number of examples each hospital trained on, so "
+        "raw patient rows are not sent to the server in the simulation.",
 
-        "Extensive benchmarking across 15 held-out validation hospitals demonstrates that the proposed "
-        "framework achieves an in-hospital mortality AUROC of 0.5672 (AUPRC: 0.0998) and a sepsis AUROC of "
-        "0.5526, outperforming isolated local hospital training (Loss: 0.9986 vs. 0.8404) while providing "
-        "robust mathematical compartmentalization. This work validates that collaborative federated graph "
-        "learning provides a viable, compliant, and scalable foundation for the next generation of "
-        "privacy-preserving critical care clinical surveillance systems.",
+        "On the 31 held-out test hospitals (18,014 patients), averaged over three training seeds, the "
+        "proposed FedAvg + GNN model reaches an in-hospital mortality AUROC of 0.819 ± 0.007 (AUPRC "
+        "0.400 ± 0.009) and an ICU mortality AUROC of 0.853 ± 0.005. It is consistently better than "
+        "local-only training on a single hospital (AUROC 0.769, 0.660 and 0.583 for hospitals of 1,562, "
+        "458 and 87 patients), and the gap grows as the single hospital gets smaller. Removing the graph "
+        "(No-GNN ablation) lowers the in-hospital mortality AUROC slightly to 0.807 ± 0.024, so the graph "
+        "gives a small but consistent gain on this task rather than a large one. These results show that a "
+        "simple federated multimodal graph model can learn useful early mortality risk from decentralized "
+        "ICU data; they come from a single-machine simulation and are not a clinical validation.",
     ]
 
     for para_text in abstract_paras:
@@ -610,7 +664,7 @@ def build_report():
     r_kw_label.bold = True
     r_kw = p_kw.add_run(
         "Federated Learning, Graph Neural Networks, Multimodal Deep Learning, eICU Dataset, "
-        "Sepsis Prediction, Mortality Risk Stratification, Privacy-Preserving AI, Patient Similarity Networks."
+        "ICU Mortality Prediction, Mortality Risk Stratification, Federated Simulation, Patient Similarity Networks."
     )
     r_kw.font.name = "Times New Roman"
     r_kw.font.size = Pt(12)
@@ -625,65 +679,65 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     toc_data = [
-        ("", "Certificate", "ii"),
-        ("", "Declaration", "iii"),
-        ("", "Acknowledgement", "iv"),
-        ("", "Abstract", "v"),
-        ("", "Table of Contents", "vii"),
-        ("", "List of Figures", "ix"),
-        ("", "List of Tables", "x"),
-        ("1", "Introduction", "1"),
-        ("1.1", "Clinical Background & Motivation", "1"),
-        ("1.2", "The Privacy-Utility Conundrum in Healthcare", "2"),
-        ("1.3", "Challenges in Multimodal Critical Care Modeling", "3"),
-        ("1.4", "Proposed Federated Graph Learning Paradigm", "4"),
-        ("1.5", "Organization of the Report", "5"),
-        ("2", "Literature Review", "6"),
-        ("2.1", "Clinical Risk Stratification Systems", "6"),
-        ("2.2", "Deep Learning for Electronic Health Records", "7"),
-        ("2.3", "Multimodal Representation Learning in Medicine", "9"),
-        ("2.4", "Graph Neural Networks & Patient Similarity Networks", "10"),
-        ("2.5", "Federated Learning in Distributed Healthcare", "12"),
-        ("2.6", "Critical Analysis and Research Gaps", "14"),
-        ("3", "Problem Definition and Objectives", "15"),
-        ("3.1", "Formal Problem Formulation", "15"),
-        ("3.2", "Research Objectives", "16"),
-        ("3.3", "Technical Scope & Boundary Conditions", "17"),
-        ("4", "Proposed Methodology and Work Description", "18"),
-        ("4.1", "System Architectural Overview", "18"),
-        ("4.2", "Multimodal Data Ingestion & Canonical Alignment", "19"),
-        ("4.3", "Modality-Specific Encoders", "21"),
-        ("4.4", "Multimodal Non-Linear Fusion Layer", "23"),
+        ("", "Certificate", "3"),
+        ("", "Declaration", "4"),
+        ("", "Acknowledgement", "5"),
+        ("", "Abstract", "6"),
+        ("", "Table of Contents", "8"),
+        ("", "List of Figures", "11"),
+        ("", "List of Tables", "11"),
+        ("1", "Introduction", "13"),
+        ("1.1", "Clinical Background & Motivation", "13"),
+        ("1.2", "The Privacy-Utility Conundrum in Healthcare", "13"),
+        ("1.3", "Challenges in Multimodal Critical Care Modeling", "14"),
+        ("1.4", "Proposed Federated Graph Learning Paradigm", "14"),
+        ("1.5", "Organization of the Report", "14"),
+        ("2", "Literature Review", "16"),
+        ("2.1", "Clinical Risk Stratification Systems", "16"),
+        ("2.2", "Deep Learning for Electronic Health Records", "16"),
+        ("2.3", "Multimodal Representation Learning in Medicine", "17"),
+        ("2.4", "Graph Neural Networks & Patient Similarity Networks", "17"),
+        ("2.5", "Federated Learning in Distributed Healthcare", "18"),
+        ("2.6", "Critical Analysis and Research Gaps", "19"),
+        ("3", "Problem Definition and Objectives", "20"),
+        ("3.1", "Formal Problem Formulation", "20"),
+        ("3.2", "Research Objectives", "20"),
+        ("3.3", "Technical Scope & Boundary Conditions", "21"),
+        ("4", "Proposed Methodology and Work Description", "22"),
+        ("4.1", "System Architectural Overview", "22"),
+        ("4.2", "Multimodal Data Ingestion & Canonical Alignment", "23"),
+        ("4.3", "Modality-Specific Encoders", "23"),
+        ("4.4", "Multimodal Non-Linear Fusion Layer", "24"),
         ("4.5", "Intra-Hospital Patient Graph Construction", "24"),
-        ("4.6", "Graph Representation Learning (PatientGNN)", "26"),
-        ("4.7", "Multi-Task Clinical Prediction Heads", "28"),
-        ("4.8", "Joint Multi-Task Objective with Imbalance Weighting", "29"),
-        ("5", "Proposed Algorithms", "30"),
-        ("5.1", "Client-Side Local Multimodal Graph Training", "30"),
-        ("5.2", "Server-Side Federated Averaging Coordination", "31"),
-        ("6", "Flowchart, Block Diagram, and DFD", "32"),
-        ("6.1", "System Architectural Block Diagram", "32"),
-        ("6.2", "Data Flow Diagram (DFD)", "33"),
-        ("6.3", "Graph Construction Flowchart", "35"),
-        ("7", "Implementation Details & Technology Stack", "36"),
-        ("7.1", "Hardware & Software Environments", "36"),
-        ("7.2", "Dataset Specification (eICU Database)", "37"),
-        ("7.3", "Data Pipeline Implementation", "38"),
-        ("7.4", "Deep Learning & GNN Modules", "39"),
-        ("7.5", "Federated Training Engine", "41"),
-        ("8", "Result Discussion and Comparative Analysis", "42"),
-        ("8.1", "Experimental Setup & Evaluation Protocol", "42"),
-        ("8.2", "Clinical Evaluation Metrics", "43"),
-        ("8.3", "Federated Convergence Dynamics", "44"),
-        ("8.4", "Comparative Baseline Evaluation", "46"),
-        ("8.5", "Topological Graph Ablation Analysis", "48"),
-        ("9", "Conclusion and Future Scope", "49"),
-        ("9.1", "Summary of Contributions", "49"),
-        ("9.2", "Limitations of the Current Study", "50"),
-        ("9.3", "Future Research Directions", "50"),
-        ("", "References (IEEE Format)", "52"),
-        ("", "List of Publications", "55"),
-        ("", "Plagiarism & Authenticity Report", "56"),
+        ("4.6", "Graph Representation Learning (PatientGNN)", "25"),
+        ("4.7", "Multi-Task Clinical Prediction Heads", "25"),
+        ("4.8", "Joint Multi-Task Objective with Imbalance Weighting", "25"),
+        ("5", "Proposed Algorithms", "27"),
+        ("5.1", "Client-Side Local Multimodal Graph Training", "27"),
+        ("5.2", "Server-Side Federated Averaging Coordination", "27"),
+        ("6", "Flowchart, Block Diagram, and DFD", "29"),
+        ("6.1", "System Architectural Block Diagram", "29"),
+        ("6.2", "Data Flow Diagram (DFD)", "29"),
+        ("6.3", "Graph Construction Flowchart", "30"),
+        ("7", "Implementation Details & Technology Stack", "31"),
+        ("7.1", "Hardware & Software Environments", "31"),
+        ("7.2", "Dataset Specification (eICU Database)", "31"),
+        ("7.3", "Data Pipeline Implementation", "32"),
+        ("7.4", "Deep Learning & GNN Modules", "32"),
+        ("7.5", "Federated Training Engine", "33"),
+        ("8", "Result Discussion and Comparative Analysis", "35"),
+        ("8.1", "Experimental Setup & Evaluation Protocol", "35"),
+        ("8.2", "Clinical Evaluation Metrics", "35"),
+        ("8.3", "Federated Convergence Dynamics", "35"),
+        ("8.4", "Comparative Baseline Evaluation", "36"),
+        ("8.5", "Patient Graph Visualization", "38"),
+        ("9", "Conclusion and Future Scope", "40"),
+        ("9.1", "Summary of Contributions", "40"),
+        ("9.2", "Limitations of the Current Study", "40"),
+        ("9.3", "Future Research Directions", "41"),
+        ("", "References (IEEE Format)", "43"),
+        ("", "List of Publications", "45"),
+        ("", "Plagiarism & Authenticity Report", "46"),
     ]
 
     t_toc = doc.add_table(rows=len(toc_data) + 1, cols=3)
@@ -750,12 +804,12 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     figures_list = [
-        ("Figure 1", "Federated Multimodal Graph Learning End-to-End System Architecture", "32"),
-        ("Figure 2", "Data Flow Diagram (Level 0 Context and Level 1 Functional Pipeline)", "34"),
-        ("Figure 3", "Hospital Patient Population Scale and Distribution across 207 eICU Sites", "38"),
-        ("Figure 4", "Federated Global Training Convergence Curves (Loss and Clinical AUROC)", "45"),
-        ("Figure 5", "Comparative Baseline Performance Analysis (Local-Only vs. No-GNN vs. FedAvg)", "47"),
-        ("Figure 6", "Intra-Hospital Patient Similarity Graph Topology (Hospital 102 Exemplar)", "48"),
+        ("Figure 1", "Federated Multimodal Graph Learning End-to-End System Architecture", "29"),
+        ("Figure 2", "Data Flow Diagram (Level 0 Context and Level 1 Functional Pipeline)", "30"),
+        ("Figure 3", "Hospital Patient Population Scale and Distribution across 207 eICU Sites", "32"),
+        ("Figure 4", "Validation Loss and Mortality AUROC per Round (FedAvg + GNN vs No-GNN, mean ± SD over 3 seeds)", "36"),
+        ("Figure 5", "Test-Hospital Performance: FedAvg + GNN vs No-GNN vs Local-Only", "38"),
+        ("Figure 6", "Patient Similarity Graph Built by the Trained Model on Test Hospital 120", "39"),
     ]
 
     t_lof = doc.add_table(rows=len(figures_list) + 1, cols=3)
@@ -777,12 +831,12 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     tables_list = [
-        ("Table 1", "Multimodal Feature Modalities in Critical Care Medicine", "8"),
-        ("Table 2", "Comparison of Contemporary Machine Learning Healthcare Frameworks", "13"),
-        ("Table 3", "Canonical Feature Dimensions and Modality Specifications", "20"),
-        ("Table 4", "Hyperparameter Configuration for Federated Patient Graph Model", "41"),
-        ("Table 5", "Round-by-Round Global Federated Convergence Progression", "44"),
-        ("Table 6", "Comparative Benchmark Results against Baselines and Ablations", "46"),
+        ("Table 1", "Multimodal Feature Modalities in Critical Care Medicine", "17"),
+        ("Table 2", "Comparison of Contemporary Machine Learning Healthcare Frameworks", "18"),
+        ("Table 3", "Canonical Feature Dimensions and Modality Specifications", "22"),
+        ("Table 4", "Hyperparameter Configuration for Federated Patient Graph Model", "33"),
+        ("Table 5", "Validation Convergence of the Proposed FedAvg + GNN Model (mean of 3 seeds)", "36"),
+        ("Table 6", "Test-Hospital Results (mean ± SD over 3 seeds)", "37"),
     ]
 
     t_lot = doc.add_table(rows=len(tables_list) + 1, cols=3)
@@ -823,8 +877,8 @@ def build_report():
         "physiological data available at unprecedented scale. Every hour, bedside monitors record physiological "
         "waveforms, clinical laboratories produce biochemistry panels, and clinicians administer titrated "
         "vasopressors and fluid boluses. Developing predictive artificial intelligence (AI) systems capable of "
-        "continuously monitoring these multi-stream inputs to forecast clinical mortality and sepsis hours "
-        "before irreversible hemodynamic collapse is therefore of paramount clinical importance [5]."
+        "using these multi-stream inputs to estimate the risk of death early in the ICU stay, while there "
+        "is still time to act, is therefore of clear clinical importance [5]."
     ))
 
     add_heading_2(doc, "1.2 The Privacy-Utility Conundrum in Healthcare")
@@ -855,8 +909,8 @@ def build_report():
     add_para(doc, (
         "Challenge 1 \u2014 Heterogeneous Modality Representation: ICU patient records are inherently multimodal. "
         "They encompass static tabular demographics (age, biological sex, admission type, chronic comorbidities) "
-        "and high-dimensional dynamic time-series (blood pressure, heart rate, blood gas measurements, "
-        "intravenous medication infusions). Static variables capture baseline physiological reserve, whereas "
+        "and dynamic time-series (laboratory results, intravenous infusions, medications and treatments). "
+        "Static variables capture baseline physiological reserve, whereas "
         "temporal streams capture acute deterioration trajectories. Fusing these fundamentally disparate "
         "temporal granularities requires specialized modality encoders [11]."
     ))
@@ -869,25 +923,26 @@ def build_report():
         "relational inductive biases [15]."
     ))
     add_para(doc, (
-        "Challenge 3 \u2014 Severe Class Imbalance & Clinical Non-I.I.D. Distributions: ICU mortality and "
-        "septic shock are low-frequency, high-stakes outcomes, typically occurring in only 8% to 15% of "
-        "admissions. Furthermore, patient volumes across community hospitals and tertiary academic medical "
-        "centers vary by orders of magnitude (ranging from 10 to over 7,000 patients per site in the eICU "
-        "database), creating severe statistical heterogeneity [25]."
+        "Challenge 3 \u2014 Class Imbalance & Non-I.I.D. Hospitals: death is a low-frequency, high-stakes "
+        "outcome: in the eICU data used here, 9.0% of ICU encounters end in in-hospital death and 5.4% in "
+        "ICU death. Furthermore, patient volumes across community hospitals and tertiary academic medical "
+        "centers vary by orders of magnitude (from 3 to 7,059 encounters per hospital in the eICU "
+        "database), creating strong statistical heterogeneity [25]."
     ))
 
     add_heading_2(doc, "1.4 Proposed Federated Graph Learning Paradigm")
     add_para(doc, (
         "To overcome these challenges, this project presents an end-to-end Federated Multimodal Graph "
-        "Learning Framework for In-Hospital Mortality and Sepsis prediction. The framework guarantees that "
-        "raw patient records never leave the local firewall of any hospital. Each hospital client independently "
+        "Learning Framework for early In-Hospital and ICU Mortality prediction. In the federated design, raw "
+        "patient records stay with each hospital; in this project the hospitals are simulated as separate "
+        "clients inside one program on one machine. Each hospital client independently "
         "executes feature extraction, modality encoding (Tabular MLP + Time-series LSTM), and multimodal "
-        "fusion. Within each hospital, an intra-hospital patient graph is constructed using k-nearest "
+        "fusion. Within each hospital, a patient graph is constructed for every mini-batch using k-nearest "
         "neighbors (k-NN) over unified patient embeddings. A Graph Neural Network (PatientGNN) then "
-        "propagates structural patient similarity signals locally. Only model parameter gradients are "
-        "transmitted to a central coordinator for Federated Averaging (FedAvg) aggregation [20]. By "
-        "reconciling multi-modal representation learning, graph-based phenotypic modeling, and federated "
-        "optimization, the framework establishes a compliant, robust paradigm for collaborative clinical AI."
+        "passes information between similar patients. Only model weights are sent to the central "
+        "server for Federated Averaging (FedAvg) aggregation [20]. The project combines multimodal "
+        "representation learning, graph-based patient similarity and federated optimization in one "
+        "prototype, and measures on held-out hospitals whether each part helps."
     ))
 
     add_heading_2(doc, "1.5 Organization of the Report")
@@ -963,8 +1018,9 @@ def build_report():
         "Fusion techniques are categorized into early fusion (concatenation of raw feature vectors), late "
         "fusion (combining modality-specific decision logits via ensemble averaging), and intermediate fusion "
         "(learning joint representation spaces via non-linear projection or cross-attention) [12]. Recent "
-        "clinical studies by Bardak et al. [13] demonstrated that intermediate multimodal fusion consistently "
-        "outperforms unimodal models in mortality and readmission forecasting. However, current multimodal "
+        "work by Bardak and Tan [13] showed that combining entities extracted from clinical notes with ICU "
+        "time series improved mortality and length-of-stay prediction over a time-series-only model. However, "
+        "most multimodal "
         "architectures operate almost exclusively in centralized environments, failing to account for "
         "institutional data privacy boundaries."
     ))
@@ -978,10 +1034,10 @@ def build_report():
     rows_t1 = [
         ("Static Tabular", "Demographics (Age, Gender, BMI), Admission Type, Comorbidities",
          "Fixed-size vector x_tab \u2208 \u211d\u2076\u2077", "Multi-Layer Perceptron (MLP)"),
-        ("Dynamic Time-Series", "Vital signs (HR, MAP, SpO\u2082), Laboratory panels, Infusion rates",
-         "Sequential tensor X_ts \u2208 \u211d\u1d40\u02e3\u2077\u2074", "2-Layer Bidirectional LSTM"),
-        ("Relational Graph", "Intra-hospital patient phenotypic similarity edges",
-         "Adjacency matrix A \u2208 \u211d\u1d3a\u02e3\u1d3a", "GraphSAGE / GAT"),
+        ("Dynamic Time-Series", "Laboratory panels, infusion rates, medications, treatments (4-hour bins)",
+         "Sequential tensor X_ts \u2208 \u211d\u1d40\u02e3\u2077\u2074", "2-Layer LSTM"),
+        ("Relational Graph", "Patient similarity edges within a hospital mini-batch",
+         "Adjacency matrix A \u2208 \u211d\u1d3a\u02e3\u1d3a", "GraphSAGE / GAT / GCN"),
         ("Multimodal Fused", "Joint tabular-temporal latent patient representation",
          "Unified embedding z \u2208 \u211d\u00b9\u00b2\u2078", "Non-linear Projection Layer"),
     ]
@@ -1003,11 +1059,10 @@ def build_report():
         "perform spectral first-order localized graph convolutions; GraphSAGE by Hamilton et al. [17], which "
         "enables inductive representation learning on large graphs via neighborhood sampling and aggregation; "
         "and Graph Attention Networks (GAT) by Veli\u010dkovi\u0107 et al. [18], which employ self-attention to "
-        "dynamically weight neighbor importance. In intensive care modeling, Rocheteau et al. [19] showed "
-        "that propagating patient similarity signals through GNNs enhances length-of-stay and mortality "
-        "prediction by clustering patients with similar acute decompensation profiles. Nonetheless, prior "
-        "graph learning frameworks assume complete access to a centralized patient graph, which is strictly "
-        "prohibited across federated hospitals."
+        "dynamically weight neighbor importance. In intensive care modeling, Rocheteau et al. [19] combined "
+        "an LSTM with a GNN over a diagnosis-based patient graph and improved length-of-stay prediction on "
+        "eICU. Such graph learning methods, however, assume access to one centralized patient graph, which "
+        "is not available when hospitals cannot share patient data."
     ))
 
     add_heading_2(doc, "2.5 Federated Learning in Distributed Healthcare Systems")
@@ -1019,9 +1074,9 @@ def build_report():
     ))
     add_para(doc, (
         "In healthcare, cross-silo federated learning has emerged as the premier privacy-preserving "
-        "paradigm [21]. Rieke et al. [22] articulated the future of digital health through federated "
-        "learning, demonstrating that FL preserves patient confidentiality while enabling models to achieve "
-        "performance parity with centralized counterparts. Subsequent consortia demonstrated federated tumor "
+        "paradigm [21]. Rieke et al. [22] argued that federated learning can let hospitals collaborate "
+        "without pooling patient data while reaching performance close to centralized training. "
+        "Multi-institution studies have demonstrated federated tumor "
         "segmentation (Sheller et al. [23]) and COVID-19 triage (Dayan et al. [24]) across international "
         "healthcare networks."
     ))
@@ -1044,7 +1099,8 @@ def build_report():
         ("Centralized DL [7, 8]", "None", "High", "None", "No"),
         ("APACHE/SOFA [1, 3]", "High (Local)", "Low", "None", "Yes"),
         ("Standard FedAvg [20, 22]", "High (Weights)", "Moderate", "None", "Yes"),
-        ("Proposed Framework (Ours)", "Full Compliance", "Complete (67D+74D)", "k-NN Graph", "207 Hospitals"),
+        ("This project", "Weights only (simulated)", "Tabular + time series (67D + 74D)", "k-NN graph per batch",
+         "145 training hospitals (simulated)"),
     ]
     for i, row in enumerate(rows_t2):
         for j, val in enumerate(row):
@@ -1059,9 +1115,9 @@ def build_report():
     add_para(doc, (
         "Gap 1 \u2014 Disconnect Between GNNs and Federated Privacy: Existing patient similarity graph "
         "models assume that a global graph spanning all patients across all medical centers can be "
-        "constructed. Under healthcare privacy laws, linking patient records across distinct hospitals "
-        "violates legal mandates. There is an acute lack of architectures that restrict graph convolutions "
-        "strictly to local intra-hospital boundaries while aggregating model parameters globally."
+        "constructed. In practice, sharing patient records across hospitals is restricted by privacy law "
+        "and data agreements. Few architectures keep graph convolutions inside each hospital while "
+        "aggregating model parameters globally."
     ))
     add_para(doc, (
         "Gap 2 \u2014 Limited Multimodal Integration in Federated Healthcare: Prior healthcare FL studies "
@@ -1071,15 +1127,14 @@ def build_report():
     ))
     add_para(doc, (
         "Gap 3 \u2014 Neglect of Extreme Clinical Imbalance in Multi-Task FL: Simultaneous prediction of "
-        "correlated critical care events (mortality and sepsis) within federated learning under extreme "
+        "correlated critical care events (in-hospital and ICU mortality) within federated learning under "
         "positive outcome scarcity (often <10%) is rarely evaluated on large-scale real-world multi-center "
         "benchmarks."
     ))
     add_para(doc, (
-        "This project directly addresses these gaps by engineering the first end-to-end framework "
-        "integrating canonical multimodal EHR encoding, intra-hospital patient graph learning, "
-        "positive-class weighted multi-task prediction, and sample-weighted federated averaging across "
-        "207 real-world intensive care hospitals."
+        "This project explores these gaps with an end-to-end prototype that combines canonical multimodal "
+        "EHR encoding, intra-hospital patient graph learning, positive-class weighted multi-task prediction "
+        "and federated averaging, evaluated on eICU with a hospital-level train / validation / test split."
     ))
     doc.add_page_break()
 
@@ -1090,33 +1145,37 @@ def build_report():
 
     add_heading_2(doc, "3.1 Formal Problem Formulation")
     add_para(doc, (
-        "Let H = {H\u2081, H\u2082, ..., H\u2096} denote a federation of K = 207 independent, privacy-conscious "
-        "hospital clients derived from the multi-center eICU Collaborative Research Database. Each hospital "
-        "H\u2096 possesses a private local dataset D\u2096 containing N\u2096 patient ICU admissions:"
+        "Let H = {H\u2081, H\u2082, ..., H\u2096} denote the K = 145 training hospitals (clients) of the multi-center "
+        "eICU Collaborative Research Database; a further 31 hospitals are used for validation and 31 for "
+        "testing. Each hospital H\u2096 holds a local dataset D\u2096 of N\u2096 ICU stays that lasted at least 24 hours:"
     ))
     add_para(doc, (
         "    D\u2096 = {(x_tab\u207a\u2096\u00b7\u2071, X_ts\u207a\u2096\u00b7\u2071, y_mort\u207a\u2096\u00b7\u2071, "
-        "y_seps\u207a\u2096\u00b7\u2071)}\u1d62\u208c\u2081\u1d3a\u2096"
+        "y_icu\u207a\u2096\u00b7\u2071)}\u1d62\u208c\u2081\u1d3a\u2096"
     ), align=WD_ALIGN_PARAGRAPH.CENTER, size=11, space_after=8, italic=True)
     add_para(doc, (
         "where:\n"
         "\u2022 x_tab \u2208 \u211d\u2076\u2077 is a 67-dimensional vector of static demographic, severity, and admission variables.\n"
-        "\u2022 X_ts \u2208 \u211d^(T\u1d62 \u00d7 74) is a dynamic time-series matrix containing 74 hourly physiological "
-        "variables recorded over T\u1d62 \u2264 48 hours.\n"
+        "\u2022 X_ts \u2208 \u211d^(T\u1d62 \u00d7 74) is a time-series matrix of 74 variables (labs, infusions, medications, "
+        "treatments) in 4-hour bins from the first 24 hours of the ICU stay (T\u1d62 \u2264 6 bins).\n"
         "\u2022 y_mort \u2208 {0, 1} is the ground-truth binary label indicating in-hospital mortality.\n"
-        "\u2022 y_seps \u2208 {0, 1} is the ground-truth binary label indicating sepsis / ICU mortality."
+        "\u2022 y_icu \u2208 {0, 1} is the ground-truth binary label indicating ICU mortality.\n"
+        "Because only stays of at least 24 hours are included, the input window always ends before "
+        "the outcome is known."
     ))
     add_para(doc, (
-        "Crucially, the raw datasets D\u2096 must remain strictly within hospital H\u2096. The server S cannot "
-        "inspect, query, or store any D\u2096. The objective is to collaboratively train a global parameter "
-        "vector W* across all K hospitals that minimizes the global multi-task empirical risk:"
+        "In a real deployment, D\u2096 would stay inside hospital H\u2096 and the server S would only receive model "
+        "weights; this project simulates that setting on one machine. The objective is to train a global "
+        "parameter vector W* across the K hospitals that minimizes the global multi-task empirical risk:"
     ))
     add_para(doc, (
         "    min_W F(W) = \u2211\u2096\u208c\u2081\u1d37 (N\u2096 / N_total) \u00b7 F\u2096(W)"
     ), align=WD_ALIGN_PARAGRAPH.CENTER, size=11, space_after=8, italic=True)
     add_para(doc, (
         "where N_total = \u2211\u2096 N\u2096 is the total patient population across the federation, and F\u2096(W) "
-        "is the local multi-task loss evaluated exclusively on local data D\u2096."
+        "is the local multi-task loss evaluated exclusively on local data D\u2096. In practice, each "
+        "communication round samples 10 hospitals and weights their updates by the number of examples "
+        "they trained on (Chapter 5)."
     ))
 
     add_heading_2(doc, "3.2 Research Objectives")
@@ -1136,17 +1195,18 @@ def build_report():
         "tabular and temporal embeddings into a unified 128-dimensional latent patient representation space.",
 
         "Objective 4 \u2014 Intra-Hospital Patient Graph Construction: Construct local patient similarity "
-        "graphs within each hospital boundary using k-nearest neighbors (k=5) over cosine metric distances, "
-        "strictly prohibiting cross-hospital edges.",
+        "graphs inside each hospital using k-nearest neighbors (k=5) over cosine similarity, built per "
+        "mini-batch of 32 patients so that no edge crosses hospitals.",
 
-        "Objective 5 \u2014 Graph Representation Learning: Implement and evaluate localized Graph Neural "
-        "Networks (GraphSAGE, GAT, GCN) to propagate clinical phenotypic signals among correlated patients.",
+        "Objective 5 \u2014 Graph Representation Learning: Implement Graph Neural Network layers (GraphSAGE, "
+        "GAT, GCN) that pass information between similar patients; the experiments use GraphSAGE.",
 
         "Objective 6 \u2014 Multi-Task Outcome Prediction: Engineer dual classification heads for simultaneous "
-        "In-Hospital Mortality and Sepsis prediction, optimized using positive-class weighted loss.",
+        "In-Hospital and ICU Mortality prediction, optimized using positive-class weighted loss.",
 
         "Objective 7 \u2014 Federated Orchestration & Benchmarking: Implement Federated Averaging (FedAvg), "
-        "training across hospital clients and benchmarking against Local-Only and No-GNN ablation baselines.",
+        "training across hospital clients and benchmarking against Local-Only and No-GNN ablation baselines "
+        "on held-out test hospitals.",
     ]
     for obj in objectives:
         add_para(doc, obj, space_after=8)
@@ -1156,15 +1216,16 @@ def build_report():
         "To ensure clinical fidelity, reproducibility, and computational rigor, the scope of this project "
         "is governed by the following constraints:\n\n"
         "\u2022 Modality Scope: Strictly restricted to 2 clinical modalities: Structured Static Tabular data "
-        "and Dynamic Temporal Time-Series. Unstructured clinical text notes are excluded in compliance with "
-        "the eICU database specification.\n"
-        "\u2022 Privacy Boundary: Local patient similarity graphs are strictly intra-hospital. Edges connect "
-        "patients admitted to the same facility only.\n"
-        "\u2022 Federated Aggregation: Only neural network weights are communicated to the central server. "
-        "Raw data, embeddings, and graph structures remain local.\n"
-        "\u2022 Sequence Window: Continuous time-series observations are evaluated over the initial 48 hours "
-        "of ICU admission, standardizing early warning prediction windows.\n"
-        "\u2022 Evaluation Protocol: Held-out validation hospitals never participate in federated training rounds."
+        "and Dynamic Temporal Time-Series. Unstructured clinical notes are not used.\n"
+        "\u2022 Graph Boundary: Patient similarity graphs are built within one hospital (and one mini-batch). "
+        "Edges connect patients of the same hospital only.\n"
+        "\u2022 Federated Aggregation: Only neural network weights are passed to the server step. Raw data, "
+        "embeddings, and graph structures stay in the client step (simulated on one machine).\n"
+        "\u2022 Prediction Window: Time-series inputs are limited to the first 24 hours of the ICU stay (six "
+        "4-hour bins), and only patients still in the ICU at 24 hours are included, so the input never "
+        "contains the outcome.\n"
+        "\u2022 Evaluation Protocol: Hospitals are split into 145 training, 31 validation (checkpoint selection "
+        "only) and 31 test hospitals (final evaluation only)."
     ))
     doc.add_page_break()
 
@@ -1181,22 +1242,27 @@ def build_report():
         "Canonical Feature Alignment, (2) Modality-Specific Feature Encoding, (3) Intermediate Multimodal "
         "Fusion, (4) Intra-Hospital Patient Graph Assembly and GNN Propagation, and (5) Multi-Task Loss "
         "Computation. The central coordinator orchestrates communication rounds, samples participating "
-        "hospital clients, aggregates parameter weights via sample-weighted FedAvg, and evaluates global "
-        "generalization on a strictly held-out cohort of validation hospitals."
+        "hospital clients, aggregates parameter weights via FedAvg (weighted by examples trained), and "
+        "selects the best round on 31 validation hospitals. A separate set of 31 test hospitals is used "
+        "only once, for the final benchmark in Chapter 8."
     ))
 
     # Table 3
     add_table_caption(doc, "Table 3: Canonical Feature Dimensions and Modality Specifications")
-    t3 = doc.add_table(rows=6, cols=4)
+    t3 = doc.add_table(rows=9, cols=4)
     headers3 = ["Feature Category", "Raw Data Source", "Canonical Dimension", "Normalization"]
     for j, h in enumerate(headers3):
         t3.rows[0].cells[j].paragraphs[0].add_run(h)
     rows_t3 = [
-        ("Demographics & Baseline", "patient.csv, hospital.csv", "12 variables", "Z-score + One-hot"),
-        ("Admission & Comorbidity", "diagnosis.csv, admissionDrug.csv", "35 variables", "Binary indicators (0/1)"),
-        ("Acute Severity Scores", "apachePatientResult.csv", "20 variables", "Z-score standardization"),
-        ("Laboratory Panels", "lab.csv, timeseries_features", "20 continuous tests", "Z-score normalized"),
-        ("Medication & Infusion", "infusionDrug.csv, medication.csv", "54 rate/binary streams", "Rate scaling & binary"),
+        ("Tabular: demographics & admission", "patient.csv", "10 variables", "Per-hospital z-score"),
+        ("Tabular: APACHE scores, GCS, day-1 labs, comorbidities", "apachePatientResult.csv, apachePredVar.csv",
+         "18 variables", "Per-hospital z-score"),
+        ("Tabular: diagnosis categories", "diagnosis.csv", "18 variables (17 flags + count)", "Per-hospital z-score"),
+        ("Tabular: admission drugs", "admissionDrug.csv", "21 variables (20 flags + count)", "Per-hospital z-score"),
+        ("Time series: laboratory tests", "lab.csv", "20 variables", "Pre-standardized in processed files"),
+        ("Time series: infusions", "infusionDrug.csv", "20 variables", "Pre-standardized in processed files"),
+        ("Time series: medications", "medication.csv", "20 variables", "Pre-standardized in processed files"),
+        ("Time series: treatments", "treatment.csv", "14 variables", "Pre-standardized in processed files"),
     ]
     for i, row in enumerate(rows_t3):
         for j, val in enumerate(row):
@@ -1206,51 +1272,56 @@ def build_report():
     add_heading_2(doc, "4.2 Multimodal Data Ingestion & Canonical Alignment")
     add_para(doc, (
         "A critical innovation in our framework is the canonical feature alignment engine implemented in "
-        "datasets.py. Across the 208 hospital partitions in eICU, local feature parquets exhibit significant "
-        "schema heterogeneity caused by differences in hospital laboratory equipment, formulary offerings, "
-        "and measurement frequency. For example, Hospital 102 recorded 46 time-series columns, whereas "
-        "Hospital 108 recorded 56 columns. Direct neural ingestion across these disparate matrices would "
-        "cause fatal parameter dimension mismatches in federated averaging."
+        "datasets.py. Across the 207 eICU hospitals with both modalities, local feature parquets differ in "
+        "their columns because hospitals record different laboratory tests, drugs and treatments. For "
+        "example, the processed time-series file of Hospital 102 has 51 columns and that of Hospital 108 "
+        "has 53. Feeding these different matrices directly into one shared model would cause parameter "
+        "dimension mismatches in federated averaging."
     ))
     add_para(doc, (
         "To resolve this, we established two canonical schema registries: canonical_tabular_features.json "
         "(67 variables) and canonical_timeseries_features.json (74 variables). When EICUTabularDataset and "
         "EICUTimeSeriesDataset instantiate on any hospital directory, the dataset reads the local parquet, "
-        "aligns columns against the canonical list in fixed order, imputes unobserved features with 0.0 "
-        "(which mathematically corresponds to the population mean in standardized z-score space), and "
-        "discards extraneous non-canonical columns. This guarantees that every hospital client in the "
-        "federation outputs tensors of identical shapes: (B, 67) for tabular data and (B, 48, 74) for "
-        "time-series sequences."
+        "aligns columns against the canonical list in fixed order, fills features that the hospital does "
+        "not record and missing values with 0.0, and discards non-canonical columns. Tabular features are "
+        "then z-scored with the hospital's own mean and standard deviation, while time-series values are "
+        "already standardized in the processed files. Only ICU stays of at least 24 hours are kept, and only "
+        "time-series bins from the first 24 hours are used. The two modalities are then joined on the "
+        "patient identifier (patientunitstayid), so every training example contains the tabular row, the "
+        "time series and the labels of the same ICU stay. Every hospital therefore produces tensors of "
+        "identical shapes: (B, 67) for tabular data and (B, 6, 74) for time-series sequences."
     ))
 
     add_heading_2(doc, "4.3 Modality-Specific Feature Learning")
     add_heading_3(doc, "4.3.1 Tabular MLP Encoder (TabularEncoder)")
     add_para(doc, (
         "The 67-dimensional static vector x_tab is processed through a 3-layer Multi-Layer Perceptron "
-        "(MLP). The architecture consists of: Linear(67 \u2192 64) \u2192 LayerNorm \u2192 ReLU \u2192 "
-        "Dropout(0.2) \u2192 Linear(64 \u2192 64) \u2192 LayerNorm \u2192 ReLU. Layer normalization is "
-        "selected over batch normalization to ensure numerical stability under variable federated batch "
-        "sizes. The encoder compresses baseline clinical demographics into a compact latent embedding "
+        "(MLP). The architecture consists of: Linear(67 \u2192 128) \u2192 BatchNorm \u2192 ReLU \u2192 "
+        "Dropout(0.2) \u2192 Linear(128 \u2192 64) \u2192 BatchNorm \u2192 ReLU \u2192 Dropout(0.2) \u2192 "
+        "Linear(64 \u2192 64). The encoder compresses baseline clinical variables into a compact latent "
+        "embedding "
         "h_tab \u2208 \u211d\u2076\u2074."
     ))
 
     add_heading_3(doc, "4.3.2 Tabular Autoencoder (Self-Supervised Pre-Training)")
     add_para(doc, (
-        "For self-supervised pre-training, a symmetric decoder maps h_tab back to \u211d\u2076\u2077 through: "
-        "Linear(64 \u2192 64) \u2192 ReLU \u2192 Linear(64 \u2192 67), optimized via Mean Squared Error "
-        "(MSE) reconstruction loss. This autoencoder pre-training step enables the tabular encoder to learn "
-        "clinically meaningful feature correlations before downstream supervised fine-tuning."
+        "For optional self-supervised pre-training, a symmetric decoder maps h_tab back to \u211d\u2076\u2077 through: "
+        "Linear(64 \u2192 64) \u2192 BatchNorm \u2192 ReLU \u2192 Dropout \u2192 Linear(64 \u2192 128) \u2192 "
+        "BatchNorm \u2192 ReLU \u2192 Dropout \u2192 Linear(128 \u2192 67), optimized via Mean Squared Error "
+        "(MSE) reconstruction loss (scripts/pretrain_tabular_ae.py). The federated experiments in "
+        "Chapter 8 do not load these pre-trained weights: all encoders are trained from random "
+        "initialization."
     ))
 
     add_heading_3(doc, "4.3.3 Temporal LSTM Encoder (TimeSeriesLSTM)")
     add_para(doc, (
-        "The dynamic time-series matrix X_ts \u2208 \u211d^(T \u00d7 74) captures sequential physiological "
-        "measurements across hourly intervals T \u2264 48. To efficiently process sequences of variable "
+        "The time-series matrix X_ts \u2208 \u211d^(T \u00d7 74) holds the measurements of the first 24 hours "
+        "in 4-hour bins (T \u2264 6). To efficiently process sequences of variable "
         "length without computing gradients over padded zero-tokens, the dataset returns the true unpadded "
         "sequence length L\u1d62. The sequences are packed using PyTorch\u2019s pack_padded_sequence and fed "
-        "into a 2-layer Long Short-Term Memory (LSTM) network with hidden dimension 64 and recurrent "
-        "dropout 0.2. The final valid hidden state of the top LSTM layer is extracted and passed through "
-        "a linear projection layer with LayerNorm to yield the temporal patient embedding h_ts \u2208 \u211d\u2076\u2074."
+        "into a 2-layer Long Short-Term Memory (LSTM) network with hidden dimension 64 and dropout 0.2 "
+        "between the two layers. The final valid hidden state of the top LSTM layer is extracted and passed "
+        "through a linear projection layer to yield the temporal patient embedding h_ts \u2208 \u211d\u2076\u2074."
     ))
 
     add_heading_2(doc, "4.4 Multimodal Non-Linear Fusion Layer")
@@ -1264,8 +1335,8 @@ def build_report():
     add_para(doc, (
         "The concatenated vector is passed through a non-linear smoothing projection block: "
         "Linear(128 \u2192 128) \u2192 BatchNorm1d(128) \u2192 ReLU \u2192 Dropout(0.2) \u2192 "
-        "Linear(128 \u2192 128). This projection layer enables the model to learn complex cross-modal "
-        "interactions (e.g., how baseline age moderates the clinical significance of acute tachycardia), "
+        "Linear(128 \u2192 128) \u2192 BatchNorm1d(128) \u2192 ReLU. This projection layer lets the model learn "
+        "cross-modal interactions (e.g., how age changes the meaning of an abnormal laboratory trend), "
         "yielding a unified patient embedding z\u1d62 \u2208 \u211d\u00b9\u00b2\u2078 for each patient admission i."
     ))
 
@@ -1273,8 +1344,8 @@ def build_report():
     add_para(doc, (
         "Unlike standard healthcare models that treat patients as isolated entities, clinical pathology is "
         "profoundly relational. Patients with similar acute phenotypes exhibit correlated mortality risks. "
-        "Within each hospital H\u2096, an intra-hospital patient similarity graph G\u2096 = (V\u2096, E\u2096) "
-        "is dynamically constructed:"
+        "Within each hospital H\u2096, a patient similarity graph G\u2096 = (V\u2096, E\u2096) is built for every "
+        "mini-batch of 32 patients, both in training and in evaluation:"
     ))
     add_para(doc, (
         "\u2022 Node Set V\u2096: Each node v\u1d62 \u2208 V\u2096 represents a patient admission i in "
@@ -1282,14 +1353,17 @@ def build_report():
         "\u2022 Edge Construction via k-NN: For each patient i in V\u2096, pairwise cosine similarity scores "
         "are computed against all other patients j in V\u2096 within the batch:\n\n"
         "    S_cos(z\u1d62, z\u2c7c) = (z\u1d62 \u00b7 z\u2c7c) / (\u2016z\u1d62\u2016\u2082 \u00b7 \u2016z\u2c7c\u2016\u2082)\n\n"
-        "Directed edges are formed from node i to its top-k nearest neighbors (default: k=5). To ensure "
-        "bidirectional message passing, the adjacency graph is converted to an undirected graph by adding "
-        "reciprocal edges. Self-loops (i, i) are appended to preserve ego-features."
+        "For every patient i, the k = 5 most similar other patients in the batch are selected, and an edge "
+        "is added from each of these neighbours to i. PyTorch Geometric passes messages from edge_index[0] "
+        "to edge_index[1], so patient i receives messages from exactly its own k nearest neighbours. The "
+        "graph is directed and is not symmetrised. No explicit self-loops are added, because GraphSAGE keeps "
+        "a separate term for the node's own features and GAT/GCN add self-loops internally. Because the graph "
+        "is rebuilt per batch, a patient's neighbours (and therefore its prediction) depend on which patients "
+        "share its batch."
     ))
     add_para(doc, (
-        "\u2022 Privacy Invariance Guarantee: Because the graph construction algorithm operates exclusively "
-        "on patient batches originating within the same hospital directory, cross-hospital edges are "
-        "mathematically impossible. Patient similarity relations exist strictly behind institutional firewalls."
+        "\u2022 Hospital Boundary: Each mini-batch contains patients of one hospital only, so edges never connect "
+        "patients from different hospitals."
     ))
 
     add_heading_2(doc, "4.6 Graph Representation Learning with PatientGNN")
@@ -1304,13 +1378,15 @@ def build_report():
         "2. Graph Attention Networks (GAT): GAT dynamically attends to neighboring patients by calculating "
         "normalized attention coefficients \u03b1\u1d62\u2c7c, weighting neighbors with higher phenotypic "
         "relevance more heavily.\n\n"
-        "3. Graph Convolutional Networks (GCN): Computes normalized first-order spectral convolutions using "
-        "symmetric normalized graph Laplacians."
+        "3. Graph Convolutional Networks (GCN): Computes normalized first-order spectral convolutions; GCN is "
+        "the only variant that uses the cosine similarity as an edge weight.\n\n"
+        "The experiments in Chapter 8 use GraphSAGE with two layers."
     ))
     add_para(doc, (
-        "PatientGNN incorporates residual skip projections around each graph layer, batch normalization, "
-        "and safe fallback handling for empty edge graphs (e.g., isolated single-patient admissions), "
-        "transforming the 128D fused embeddings into 64D graph-enhanced representations g\u1d62 \u2208 \u211d\u2076\u2074."
+        "PatientGNN incorporates residual skip projections around each graph layer and batch normalization. "
+        "If a batch has no edges (for example a single patient), the PyTorch Geometric layers simply use "
+        "each node's own features. The module transforms "
+        "the 128D fused embeddings into 64D graph-enhanced representations g\u1d62 \u2208 \u211d\u2076\u2074."
     ))
 
     add_heading_2(doc, "4.7 Multi-Task Dual Prediction Heads")
@@ -1319,16 +1395,16 @@ def build_report():
         "MultiTaskPredictionHeads module performs simultaneous risk stratification for two clinical endpoints:\n\n"
         "\u2022 Task 1 \u2014 In-Hospital Mortality Head: A 2-layer MLP with BatchNorm and Dropout computing "
         "mortality logits: \u0177_mort = W\u2082 \u00b7 ReLU(BatchNorm(W\u2081 \u00b7 g\u1d62)) + b\u2082\n\n"
-        "\u2022 Task 2 \u2014 Sepsis/ICU Mortality Head: An identical independent prediction head computing "
-        "sepsis risk logits: \u0177_seps = W\u2032\u2082 \u00b7 ReLU(BatchNorm(W\u2032\u2081 \u00b7 g\u1d62)) + b\u2032\u2082\n\n"
+        "\u2022 Task 2 \u2014 ICU Mortality Head: An identical independent prediction head computing "
+        "ICU mortality logits: \u0177_icu = W\u2032\u2082 \u00b7 ReLU(BatchNorm(W\u2032\u2081 \u00b7 g\u1d62)) + b\u2032\u2082\n\n"
         "Both heads output unbounded real-valued logits suitable for numerically stable binary cross-entropy "
         "computation via PyTorch\u2019s BCEWithLogitsLoss."
     ))
 
     add_heading_2(doc, "4.8 Joint Multi-Task Objective with Imbalance Weighting")
     add_para(doc, (
-        "In critical care populations, adverse outcomes are severely imbalanced: in-hospital mortality and "
-        "sepsis typically occur in only 8% to 15% of admissions. Standard unweighted cross-entropy loss "
+        "In critical care populations, adverse outcomes are imbalanced: in the 24-hour training cohort, "
+        "in-hospital mortality is 8.9% and ICU mortality 5.2%. Standard unweighted cross-entropy loss "
         "causes gradient starvation for the minority positive class. To counteract this, MultiTaskLoss "
         "incorporates positive-class weighting (pos_weight = 3.0):"
     ))
@@ -1337,8 +1413,8 @@ def build_report():
     ), align=WD_ALIGN_PARAGRAPH.CENTER, size=11, italic=True, space_after=8)
     add_para(doc, (
         "The overall multi-task training objective is formulated as:\n\n"
-        "    L_total = w_mort \u00b7 L_mort + w_seps \u00b7 L_seps\n\n"
-        "where w_mort = 1.0 and w_seps = 1.0. Gradients from L_total backpropagate jointly through the "
+        "    L_total = w_mort \u00b7 L_mort + w_icu \u00b7 L_icu\n\n"
+        "where w_mort = 1.0 and w_icu = 1.0. Gradients from L_total backpropagate jointly through the "
         "Prediction Heads, PatientGNN, Multimodal Fusion, and both Modality Encoders via end-to-end "
         "gradient descent."
     ))
@@ -1363,26 +1439,26 @@ def build_report():
         "\u2500" * 60,
         "Input: Global parameters W_t, local D_tab^(k), D_ts^(k),",
         "       local epochs E, batch size B, learning rate \u03b7",
-        "Output: Updated local parameters W_k^(t+1), patient count N_k",
+        "Output: Updated local parameters W_k^(t+1), examples trained n_k",
         "\u2500" * 60,
         " 1: Initialize local model M_k with parameters W_t",
-        " 2: Align D_tab^(k), D_ts^(k) to canonical features (67, 74)",
-        " 3: Set step=0, optimizer=Adam(M_k, lr=\u03b7, wd=1e-5)",
+        " 2: Load stays >= 24 h; join tabular and time series by patient ID",
+        " 3: Set step=0, n_k=0, optimizer=Adam(M_k, lr=\u03b7, wd=1e-5)",
         " 4: for epoch = 1 to E do",
-        " 5:   for batch (x_tab, y), (X_ts, lens) in DataLoader do",
-        " 6:     if batch_size < 2 then continue",
+        " 5:   for batch (x_tab, X_ts, lens, y) in DataLoader(shuffle) do",
+        " 6:     if batch_size < 2 then continue  // BatchNorm",
         " 7:     h_tab \u2190 TabularEncoder(x_tab)    // 67D \u2192 64D",
         " 8:     h_ts  \u2190 TimeSeriesLSTM(X_ts, lens) // T\u00d774D \u2192 64D",
         " 9:     z \u2190 MultimodalFusion(h_tab, h_ts) // 128D \u2192 128D",
-        "10:     edges \u2190 build_knn_graph(z, k=5, cosine)",
+        "10:     edges \u2190 build_knn_graph(z, k=5)  // neighbour\u2192patient",
         "11:     g \u2190 PatientGNN(z, edges)       // 128D \u2192 64D",
-        "12:     \u0177_m, \u0177_s \u2190 MultiTaskHeads(g)",
-        "13:     loss \u2190 MultiTaskLoss(\u0177_m, \u0177_s, y, pw=3.0)",
+        "12:     \u0177_m, \u0177_i \u2190 MultiTaskHeads(g)",
+        "13:     loss \u2190 MultiTaskLoss(\u0177_m, \u0177_i, y, pw=3.0)",
         "14:     optimizer.zero_grad(); loss.backward()",
         "15:     clip_grad_norm_(M_k, max_norm=5.0)",
-        "16:     optimizer.step(); step += 1",
-        "17:     if step \u2265 S_max then break",
-        "18: return M_k.state_dict(), len(D_tab^(k))",
+        "16:     optimizer.step(); step += 1; n_k += |batch|",
+        "17:     if step \u2265 S_max (= 30) then break",
+        "18: return M_k.state_dict(), n_k  // examples trained",
         "\u2500" * 60,
     ]
     alg1_text = "\n".join(alg1_lines)
@@ -1392,32 +1468,33 @@ def build_report():
     add_heading_2(doc, "5.2 Algorithm 2: Server-Side Federated Averaging Coordination")
     add_para(doc, (
         "Algorithm 2 details the server-side aggregation protocol. Across each communication round, the "
-        "server samples a fraction of hospital clients, collects their local model weights, and executes "
-        "sample-weighted Federated Averaging (FedAvg)."
+        "server samples 10 training hospitals, collects their local model weights, and executes "
+        "Federated Averaging (FedAvg) weighted by the number of examples each client actually trained on. "
+        "Hospitals are processed one after another in this single-machine simulation."
     ))
 
     alg2_lines = [
         "Algorithm 2: Central Server FedAvg Orchestration",
         "\u2500" * 60,
-        "Input: Rounds R, hospitals K=207, sampling fraction C,",
-        "       held-out validation set H_val",
+        "Input: Rounds R=50, clients per round m=10,",
+        "       H_train (145), H_val (31); H_test (31) is not used here",
         "Output: Optimal global parameters W*",
         "\u2500" * 60,
-        " 1: Initialize W_0 with random orthogonal weights",
-        " 2: Split H into H_train (176) and H_val (31)",
+        " 1: Initialize W_0 randomly (PyTorch default initialization)",
+        " 2: Read the fixed split from hospital_split.json",
         " 3: for round t = 1 to R do",
-        " 4:   m \u2190 max(1, int(C \u00b7 |H_train|))",
+        " 4:   (m = 10 clients per round)",
         " 5:   S_t \u2190 RandomSample(H_train, m)",
         " 6:   updates \u2190 []",
-        " 7:   for each H_k in S_t do  // in parallel",
+        " 7:   for each H_k in S_t do  // one after another",
         " 8:     W_k, n_k \u2190 ClientUpdate(H_k, W_{t-1})",
         " 9:     updates.append((W_k, n_k))",
-        "10:   N_round \u2190 \u2211 n_k for all (W_k, n_k) in updates",
-        "11:   W_t \u2190 \u2211 (n_k/N_round) \u00b7 W_k  // FedAvg",
-        "12:   metrics \u2190 Evaluate(W_t, H_val)",
+        "10:   N_round \u2190 \u2211 n_k  (examples actually trained)",
+        "11:   W_t \u2190 \u2211 (n_k/N_round) \u00b7 W_k  // FedAvg (float tensors)",
+        "12:   metrics \u2190 Evaluate(W_t, all 31 H_val hospitals)",
         "13:   if metrics.loss < best_loss then",
-        "14:     SaveCheckpoint(W_t, 'global_model.pth')",
-        "15: return W*",
+        "14:     best_loss \u2190 metrics.loss; SaveCheckpoint(W_t)",
+        "15: return the checkpoint with the lowest validation loss",
         "\u2500" * 60,
     ]
     alg2_text = "\n".join(alg2_lines)
@@ -1435,11 +1512,11 @@ def build_report():
         "Figure 1 illustrates the high-level system architecture of the Federated Multimodal Graph "
         "Learning framework. The architecture is bifurcated into two primary domains: (i) the Central "
         "Federated Server responsible for parameter distribution, FedAvg aggregation, and validation "
-        "monitoring, and (ii) Decentralized Hospital Clients operating behind institutional firewalls. "
+        "monitoring, and (ii) Hospital Clients, each working only on its own hospital's data. "
         "Each hospital client autonomously processes local patient parquets, extracts static and temporal "
         "representations, constructs local patient similarity graphs, and optimizes local model weights. "
-        "Crucially, raw Protected Health Information (PHI) is strictly compartmentalized; only parameter "
-        "vectors are transmitted."
+        "Only parameter vectors are passed to the server. In this project the clients and the server run "
+        "in one program on one machine; the diagram shows the intended deployment."
     ))
 
     fig1_path = ASSETS_DIR / "fig1_system_architecture.png"
@@ -1450,12 +1527,13 @@ def build_report():
     add_heading_2(doc, "6.2 Data Flow Diagram (DFD Level 0 & Level 1)")
     add_para(doc, (
         "Figure 2 presents the Data Flow Diagram (DFD) delineating the lifecycle of clinical records. "
-        "At Level 0 (Context Level), the raw eICU repository is partitioned across 207 autonomous "
-        "multi-modal hospital sites. At Level 1 (Functional Pipeline), data within each hospital is "
-        "bifurcated into Static Tabular (67D) and Dynamic Temporal (74D) streams. Encoders generate "
+        "At Level 0 (Context Level), the raw eICU repository is partitioned by hospital and the 207 "
+        "hospitals are split into 145 training, 31 validation and 31 test hospitals. At Level 1 (Functional "
+        "Pipeline), data from the first 24 hours of each ICU stay is split into Static Tabular (67D) and "
+        "Time-Series (6 × 74D) streams. Encoders generate "
         "latent embeddings, the intermediate fusion layer constructs unified 128D representations, the "
         "k-NN graph builder links clinically correlated patients, and PatientGNN computes contextual "
-        "graph representations feeding the mortality and sepsis prediction heads."
+        "graph representations feeding the in-hospital and ICU mortality prediction heads."
     ))
 
     fig2_path = ASSETS_DIR / "fig2_data_flow_diagram.png"
@@ -1472,9 +1550,10 @@ def build_report():
         "are computed across all pairs, forming an affinity matrix A \u2208 \u211d^(|B\u2096| \u00d7 |B\u2096|).\n\n"
         "Phase 2 \u2014 Top-k Neighbor Selection: For each node i, the top k=5 neighbors with the highest "
         "cosine affinity are extracted via torch.topk.\n\n"
-        "Phase 3 \u2014 Undirected Symmetrization: Reciprocal edges are added to ensure symmetric message "
-        "passing, followed by self-loop insertion. This structural topology is visualized in Figure 6 "
-        "(Chapter 8), showing clear separation between stable patients and acute mortality risk clusters."
+        "Phase 3 \u2014 Edge Direction: For each node i, an edge is added from each of its k neighbours to i, "
+        "so that i aggregates messages from its own neighbours. The graph is not symmetrised and no "
+        "explicit self-loops are added. Figure 6 (Chapter 8) shows a graph built this way by the trained "
+        "model on a test hospital."
     ))
     doc.add_page_break()
 
@@ -1485,23 +1564,23 @@ def build_report():
 
     add_heading_2(doc, "7.1 Hardware & Software Environments")
     add_para(doc, (
-        "The complete software pipeline was developed and validated in a dedicated computational "
-        "environment. The following table summarizes the hardware and software specifications:"
+        "The corrected experiments in Chapter 8 were run on a single laptop CPU (no GPU). The following "
+        "table lists the hardware and the software versions used:"
     ))
 
     # Technology stack table
     add_table_caption(doc, "Table 3a: Hardware & Software Environment Specifications")
     t_hw = doc.add_table(rows=10, cols=2)
     hw_data = [
-        ("Operating System", "Ubuntu Linux 22.04 LTS (x86_64)"),
-        ("Python Version", "Python 3.12"),
-        ("Deep Learning Framework", "PyTorch 2.14.1+cu130"),
+        ("Hardware", "AMD Ryzen 7 7445HS CPU, 16 GB RAM, no GPU used"),
+        ("Operating System", "Microsoft Windows 11 Pro"),
+        ("Python Version", "Python 3.14.7"),
+        ("Deep Learning Framework", "PyTorch 2.14.1 (CPU build)"),
         ("Graph Neural Networks", "PyTorch Geometric (PyG) 2.8.1"),
-        ("Data Processing", "Pandas 2.2.x, NumPy 1.26.x, PyArrow 14.x"),
-        ("ML Evaluation Metrics", "Scikit-Learn 1.9.1"),
-        ("Visualization", "Matplotlib 3.8.x, NetworkX 3.2.x"),
-        ("Document Generation", "python-docx 0.8.x, LibreOffice 24.x"),
-        ("Virtual Environment", "Isolated .venv (pip-based dependency management)"),
+        ("Data Processing", "Pandas 3.0.5, NumPy 2.5.2, PyArrow 25.0.1"),
+        ("ML Evaluation Metrics", "Scikit-Learn 1.9.0"),
+        ("Visualization", "Matplotlib 3.11.1, NetworkX 3.7"),
+        ("Document Generation", "python-docx 1.2.0, Microsoft Word (PDF export)"),
     ]
     t_hw.rows[0].cells[0].paragraphs[0].add_run("Component").bold = True
     t_hw.rows[0].cells[1].paragraphs[0].add_run("Specification").bold = True
@@ -1513,13 +1592,14 @@ def build_report():
     add_heading_2(doc, "7.2 Dataset Specification (eICU Collaborative Database)")
     add_para(doc, (
         "The empirical evaluation utilized the multi-center eICU Collaborative Research Database [25], "
-        "comprising over 200,000 ICU admissions across 208 hospitals in the United States between 2014 "
-        "and 2015. After filtering out hospitals with incomplete modalities, exactly 207 hospitals possessed "
-        "complete multimodal data. As illustrated in Figure 3, the hospital patient cohort scale exhibits an "
-        "extreme long-tail distribution: the largest hospital (Hospital 73) contains 7,059 patients, the "
-        "median hospital (Hospital 421) contains 567 patients, and the smallest site contains only 3 "
-        "patients. This high degree of real-world scale heterogeneity rigorously tests the stability of "
-        "our federated aggregation protocol."
+        "comprising over 200,000 ICU stays across 208 hospitals in the United States between 2014 "
+        "and 2015. It is distributed through PhysioNet under a credentialed data use agreement; no "
+        "patient-level data is reproduced in this report. After preprocessing, 207 hospitals with 200,826 "
+        "ICU encounters have both modalities. As illustrated in Figure 3, hospital size is highly skewed: "
+        "the largest hospital (Hospital 73) contains 7,059 encounters, the median hospital (Hospital 421) "
+        "567, and the smallest only 3. For the early-prediction task, only stays of at least 24 hours are "
+        "used: 93,764 encounters in the 145 training hospitals, 21,100 in the 31 validation hospitals and "
+        "18,014 in the 31 test hospitals (132,878 in total)."
     ))
 
     fig3_path = ASSETS_DIR / "fig3_hospital_distribution.png"
@@ -1529,14 +1609,19 @@ def build_report():
 
     add_heading_2(doc, "7.3 Data Pipeline Implementation (datasets.py)")
     add_para(doc, (
-        "The data loading module is partitioned into two specialized PyTorch Dataset classes:\n\n"
+        "The data loading module provides three PyTorch Dataset classes:\n\n"
         "\u2022 EICUTabularDataset: Reads tabular_features.parquet, aligns columns against "
-        "canonical_tabular_features.json (67 variables), handles missing value imputation, and fits "
-        "z-score standard scalers on local feature distributions.\n\n"
-        "\u2022 EICUTimeSeriesDataset: Reads timeseries_features.parquet, groups hourly observations by "
-        "patientunitstayid, aligns against canonical_timeseries_features.json (74 continuous variables), "
-        "and packs padded sequences up to 48 hours. A custom collate function timeseries_collate_fn stacks "
-        "sequences and lengths for packed LSTM ingestion."
+        "canonical_tabular_features.json (67 variables), keeps ICU stays of at least 24 hours, fills "
+        "missing values, and fits z-score scalers on the hospital's own data.\n\n"
+        "\u2022 EICUTimeSeriesDataset: Reads timeseries_features.parquet, keeps the 4-hour bins of the first "
+        "24 hours, groups them by patientunitstayid, aligns against canonical_timeseries_features.json "
+        "(74 variables), and pads sequences to 6 steps while keeping the true lengths for packed LSTM "
+        "processing.\n\n"
+        "\u2022 EICUMultimodalDataset: Joins the two datasets on patientunitstayid so that each example holds "
+        "the tabular row, time series and labels of the same ICU stay; it raises an error on duplicate "
+        "patient IDs. One DataLoader (one shuffle) is used for both modalities. An earlier version zipped "
+        "two separately shuffled loaders, which paired labels with other patients' tabular features; this "
+        "was found and fixed before the experiments in Chapter 8."
     ))
 
     add_heading_2(doc, "7.4 Deep Learning & GNN Implementation Modules")
@@ -1548,39 +1633,61 @@ def build_report():
         "\u2022 src/graph_builder.py: Implements build_knn_graph and build_threshold_graph using vectorized "
         "PyTorch operations.\n"
         "\u2022 src/gnn.py: Implements PatientGNN supporting GraphSAGE, GAT, and GCN layers with residual "
-        "connections and empty-edge fallback.\n"
-        "\u2022 src/models.py: Implements MultiTaskPredictionHeads, FederatedPatientModel, and MultiTaskLoss."
+        "connections.\n"
+        "\u2022 src/models.py: Implements MultiTaskPredictionHeads, FederatedPatientModel (with a use_gnn switch "
+        "for the No-GNN ablation), and MultiTaskLoss.\n"
+        "\u2022 src/splits.py and src/evaluation.py: The fixed train / validation / test hospital split and the "
+        "single evaluation routine shared by training and benchmarking.\n"
+        "\u2022 src/metrics.py: AUROC, AUPRC (average precision), F1, precision, recall, specificity and Brier "
+        "score; it raises an error on invalid input instead of returning default values.\n"
+        "\u2022 tests/: Data-free unit tests (pytest) for patient alignment, target columns, the hospital split, "
+        "graph edge direction, empty graphs, FedAvg weighting and metrics."
     ))
 
     add_heading_2(doc, "7.5 Federated Training & Distributed Simulation Engine")
     add_para(doc, (
-        "The federated training orchestration is implemented in scripts/train_federated.py. The engine "
-        "simulates a realistic cross-silo federated learning environment where each hospital operates as "
-        "an independent client behind an institutional firewall. Key implementation details include:\n\n"
-        "\u2022 Hospital sampling: Each round randomly samples C \u00b7 K hospitals from the training pool.\n"
-        "\u2022 Client local training: Each sampled hospital loads its local data, initializes a model from "
-        "global weights, and trains for a fixed number of local steps.\n"
-        "\u2022 Server aggregation: Sample-weighted FedAvg combines local parameters into updated global weights.\n"
-        "\u2022 Validation: Held-out hospitals evaluate the global model without participating in training.\n"
-        "\u2022 Checkpointing: Best model is saved to pretrained_weights/global_federated_model.pth."
+        "The federated training orchestration is implemented in scripts/train_federated.py. It simulates "
+        "cross-silo federated learning in a single Python process: each hospital is a client whose data "
+        "is only used inside its own local training step. It does not implement networking, secure "
+        "aggregation or differential privacy. Key implementation details include:\n\n"
+        "\u2022 Hospital sampling: Each round samples 10 of the 145 training hospitals (own random generator, "
+        "so runs with the same seed sample the same hospitals).\n"
+        "\u2022 Client local training: Each sampled hospital starts from the global weights and trains for one "
+        "local epoch, capped at 30 optimizer steps of 32 patients.\n"
+        "\u2022 Server aggregation: FedAvg weights each client by the examples it actually trained on.\n"
+        "\u2022 Validation: All 31 validation hospitals score the global model after every round; the round "
+        "with the lowest validation loss is saved.\n"
+        "\u2022 Bookkeeping: Each run writes run_info.json (settings, code version) and training_history.json "
+        "(sampled hospitals, optimizer steps, examples and unique patients trained, validation metrics) "
+        "to results/corrected/<run>/seed<k>/.\n"
+        "\u2022 Baselines: The No-GNN ablation and the local-only baselines use the same script "
+        "(--no-gnn, --train-hospitals), and scripts/run_experiments.py runs every configuration for "
+        "three seeds."
     ))
 
     # Table 4
     add_table_caption(doc, "Table 4: Hyperparameter Configuration for Federated Patient Graph Model")
-    t4 = doc.add_table(rows=10, cols=3)
+    t4 = doc.add_table(rows=17, cols=3)
     headers4 = ["Hyperparameter", "Value", "Design Rationale"]
     for j, h in enumerate(headers4):
         t4.rows[0].cells[j].paragraphs[0].add_run(h)
     rows_t4 = [
         ("Tabular Latent Dimension", "64", "Balances compression and representation"),
-        ("LSTM Hidden Dimension", "64", "Optimal for 48-hour trajectories"),
+        ("LSTM Hidden Dimension", "64", "Small model for six 4-hour steps"),
         ("Fused Embedding Dimension", "128", "Concatenation of 64D + 64D"),
         ("k-NN Neighbors (k)", "5", "Localized similarity without over-smoothing"),
         ("Graph Metric", "Cosine", "Scale-invariant angular similarity"),
         ("GNN Architecture", "GraphSAGE", "Inductive mean aggregation with residuals"),
         ("Optimizer / Learning Rate", "Adam (\u03b7=1e-3)", "Adaptive gradient, weight decay 1e-5"),
         ("Gradient Clipping", "Max Norm = 5.0", "Prevents exploding gradients in LSTM"),
-        ("Loss Positive Weight", "pos_weight = 3.0", "Counters 10\u201315% positive class imbalance"),
+        ("Loss Positive Weight", "pos_weight = 3.0", "Counters ~9% (hospital) / ~5% (ICU) positive rate"),
+        ("Dropout", "0.2", "Regularization in encoders, fusion, GNN and heads"),
+        ("Observation Window", "First 24 h (6 \u00d7 4-h bins)", "Input ends before the outcome"),
+        ("Communication Rounds", "50", "Reaches ~140 of 145 training hospitals"),
+        ("Clients per Round", "10", "Sampled from 145 training hospitals"),
+        ("Local Training", "1 epoch, max 30 steps, batch 32", "Same budget cap for every client"),
+        ("Checkpoint Selection", "Lowest validation loss", "31 validation hospitals, all rounds"),
+        ("Training Seeds", "42, 43, 44", "Hospital split fixed (split seed 42)"),
     ]
     for i, row in enumerate(rows_t4):
         for j, val in enumerate(row):
@@ -1595,92 +1702,103 @@ def build_report():
 
     add_heading_2(doc, "8.1 Experimental Setup & Evaluation Protocol")
     add_para(doc, (
-        "To rigorously assess cross-hospital generalization without clinical data leakage, the 207 "
-        "multimodal eICU hospitals were randomly partitioned into two disjoint subsets: (1) a Federated "
-        "Training Pool containing 176 hospitals, and (2) a Held-Out Validation Pool containing 31 "
-        "hospitals (with 15 representative sites evaluated during benchmarking). At no point during "
-        "federated training were the held-out validation hospitals exposed to model parameter updates. "
-        "All reported metrics represent genuine out-of-sample generalization performance."
+        "The 207 eICU hospitals were split once, at the hospital level, into 145 training, 31 validation "
+        "and 31 test hospitals (processed/hospital_split.json, seed 42). After keeping only ICU stays of at "
+        "least 24 hours, this gives 93,764 training, 21,100 validation and 18,014 test encounters. Training "
+        "uses the training hospitals; the validation hospitals are used only to pick the best round of each "
+        "run; the 31 test hospitals are used only once, for the final benchmark in this chapter, and for "
+        "the demonstration graph in Figure 6. The test hospitals are never seen during training, checkpoint "
+        "selection or tuning, so the test metrics are out-of-sample at the hospital level. Every configuration "
+        "is run with three training seeds (42, 43, 44) with the split held fixed, and results are reported "
+        "as mean ± standard deviation over the three seeds."
     ))
 
     add_heading_2(doc, "8.2 Clinical Evaluation Metrics")
     add_para(doc, (
-        "In critical care clinical predictive modeling, standard accuracy is notoriously misleading due "
-        "to severe positive class scarcity. Consequently, performance was benchmarked across the following "
-        "clinical evaluation metrics:\n\n"
-        "\u2022 Area Under the Receiver Operating Characteristic Curve (AUROC): Quantifies discrimination "
-        "threshold-independently across all possible operating points.\n\n"
-        "\u2022 Area Under the Precision-Recall Curve (AUPRC): The gold standard clinical metric for "
-        "imbalanced outcomes, evaluating precision across varying sensitivity thresholds.\n\n"
-        "\u2022 F1-Score: The harmonic mean of clinical precision (positive predictive value) and recall "
-        "(sensitivity), providing a single balanced performance indicator.\n\n"
-        "\u2022 Specificity: Quantifies true negative identification rate, vital for preventing clinical "
-        "alarm fatigue in ICU monitoring environments."
+        "Because the positive outcomes are rare, plain accuracy is misleading, so performance is reported "
+        "with the following metrics (src/metrics.py):\n\n"
+        "\u2022 AUROC (Area Under the ROC Curve): threshold-free measure of how well the model ranks patients "
+        "who died above those who survived. The main metric in this report.\n\n"
+        "\u2022 AUPRC (Area Under the Precision-Recall Curve): computed as scikit-learn's average precision; "
+        "more informative than AUROC when positives are rare.\n\n"
+        "\u2022 Brier score: mean squared error between predicted probability and outcome (lower is better); "
+        "a simple measure of calibration.\n\n"
+        "\u2022 F1, precision, recall and specificity: reported at a fixed decision threshold of 0.5, which is "
+        "not tuned; they are secondary to the threshold-free AUROC and AUPRC.\n\n"
+        "AUROC and AUPRC are undefined when only one class is present; the evaluation always had both "
+        "classes present, so no such case occurred."
     ))
 
     add_heading_2(doc, "8.3 Federated Convergence Dynamics across Communication Rounds")
     add_para(doc, (
-        "The federated training script (scripts/train_federated.py) was executed across 5 communication "
-        "rounds, sampling 6 hospital clients per round. As detailed in Table 5 and illustrated in Figure 4, "
-        "the global multi-task loss decreased monotonically from 1.1308 in Round 1 to a minimum of 0.8845 "
-        "in Round 4. Concurrently, the mortality AUPRC improved from 0.0952 to 0.1182, confirming that "
-        "global sample-weighted FedAvg successfully extracts generalized clinical patterns without suffering "
-        "from client drift or catastrophic forgetting."
+        "The proposed model was trained for 50 communication rounds, sampling 10 of the 145 training "
+        "hospitals per round. As shown in Table 5 and Figure 4 (mean of three seeds), the validation loss "
+        "falls quickly from about 1.04 in round 1 to about 0.49 by round 10 and then stays roughly flat, "
+        "while the validation in-hospital mortality AUROC rises from about 0.65 to about 0.81. The best "
+        "round (lowest validation loss) is used as the checkpoint; across the three seeds the best round "
+        "was 43, 32 and 32. Figure 4 also overlays the No-GNN ablation: on the validation hospitals the two "
+        "curves almost coincide, so most of the learning comes from the multimodal encoders and FedAvg "
+        "rather than from the graph."
     ))
 
-    # Table 5
-    add_table_caption(doc, "Table 5: Round-by-Round Global Federated Convergence Progression")
-    t5 = doc.add_table(rows=6, cols=6)
-    headers5 = ["Round", "Sampled Clients", "Active Patients", "Val. Loss", "Mort. AUROC", "Sepsis AUROC"]
+    # Table 5 (loaded from results/corrected/fedavg_gnn)
+    conv_rows, n_seeds_conv = gnn_convergence([1, 10, 20, 30, 40, 50])
+    add_table_caption(doc, f"Table 5: Validation convergence of the proposed FedAvg + GNN model (mean of {n_seeds_conv} seeds, 31 validation hospitals)")
+    headers5 = ["Round", "Val. Loss", "Mort. AUROC", "Mort. AUPRC", "ICU AUROC"]
+    t5 = doc.add_table(rows=len(conv_rows) + 1, cols=len(headers5))
     for j, h in enumerate(headers5):
         t5.rows[0].cells[j].paragraphs[0].add_run(h)
-    rows_t5 = [
-        ("Round 1", "6 Hospitals", "2,381", "1.1308", "0.5803", "0.6713"),
-        ("Round 2", "6 Hospitals", "7,225", "0.9773", "0.4806", "0.5837"),
-        ("Round 3", "6 Hospitals", "3,080", "0.9213", "0.4967", "0.5646"),
-        ("Round 4", "6 Hospitals", "4,278", "0.8845 \u2605", "0.5120", "0.4862"),
-        ("Round 5", "6 Hospitals", "3,880", "0.9288", "0.5321", "0.5523"),
-    ]
-    for i, row in enumerate(rows_t5):
+    for i, row in enumerate(conv_rows):
         for j, val in enumerate(row):
-            r = t5.rows[i + 1].cells[j].paragraphs[0].add_run(val)
-            if "\u2605" in val:
-                r.bold = True
+            t5.rows[i + 1].cells[j].paragraphs[0].add_run(val)
     style_table_professional(t5)
 
     fig4_path = ASSETS_DIR / "fig4_training_convergence.png"
     if fig4_path.exists():
         add_image_centered(doc, fig4_path, width_inches=5.8)
-        add_figure_caption(doc, "Figure 4: Federated Global Training Convergence Curves (Loss and Clinical AUROC)")
+        add_figure_caption(doc, "Figure 4: Validation loss and in-hospital mortality AUROC per round (mean ± SD over 3 seeds), FedAvg + GNN vs No-GNN")
 
     add_heading_2(doc, "8.4 Comparative Baseline Evaluation")
     add_para(doc, (
-        "To quantify the empirical benefit of federated collaboration and graph representation learning, "
-        "three configurations were benchmarked on the 15 held-out validation hospitals using "
-        "scripts/benchmark_baselines.py:\n\n"
-        "Configuration 1 \u2014 Local-Only Model: A single hospital (Hospital 108) trains its full "
-        "multimodal graph architecture in isolation, simulating a hospital refusing federated participation.\n\n"
-        "Configuration 2 \u2014 Multimodal No-GNN Ablation: Static Tabular and Dynamic Time-series are "
-        "fused, but prediction heads are attached directly without patient graph construction.\n\n"
-        "Configuration 3 \u2014 Proposed Federated Graph Model: The global FedAvg model collaboratively "
-        "trained across the federation."
+        "To separate the benefit of federated collaboration from the benefit of the graph, five "
+        "configurations were scored on the 31 held-out test hospitals (scripts/benchmark_baselines.py), "
+        "each with three seeds:\n\n"
+        "\u2022 FedAvg + GNN (proposed): the full model, trained across the 145 training hospitals.\n\n"
+        "\u2022 FedAvg No-GNN (ablation): the same training loop and the same sampled clients each round, but "
+        "with the patient graph and GNN removed (the heads read the fused embedding directly). This "
+        "isolates the effect of the graph.\n\n"
+        "\u2022 Local-only (three hospitals): the full model trained on a single training hospital, for three "
+        "hospital sizes \u2014 hospital 183 (1,562 patients), hospital 396 (458) and hospital 61 (87). This "
+        "shows what one hospital can achieve alone, and how it depends on the hospital's size.\n\n"
+        "Every model is selected on the validation hospitals by lowest validation loss and evaluated on "
+        "the same 18,014 test patients. The local-only models train on much less data than the federated "
+        "models; this is the point of the comparison, and Table 6 should be read with that in mind."
     ))
 
-    # Table 6
-    add_table_caption(doc, "Table 6: Comparative Benchmark Results against Baselines and Ablations")
-    t6 = doc.add_table(rows=4, cols=6)
-    headers6 = ["Configuration", "Test Loss", "Mort. AUROC", "Mort. AUPRC", "Sepsis AUROC", "Privacy"]
+    # Table 6 (loaded from results/corrected/benchmark_results.json)
+    summary = load_benchmark_summary()
+    model_order = [
+        ("fedavg_gnn", "FedAvg + GNN (proposed)"),
+        ("fedavg_nognn", "FedAvg No-GNN (ablation)"),
+        ("local_183", "Local-only (hosp. 183)"),
+        ("local_396", "Local-only (hosp. 396)"),
+        ("local_61", "Local-only (hosp. 61)"),
+    ]
+    add_table_caption(doc, f"Table 6: Test-hospital results (mean ± SD over {summary['fedavg_gnn']['n_seeds']} seeds; 31 held-out hospitals, 18,014 patients)")
+    headers6 = ["Model", "Mort. AUROC", "Mort. AUPRC", "ICU AUROC", "ICU AUPRC", "Mort. Brier"]
+    keys6 = ["mort_auroc", "mort_auprc", "icu_auroc", "icu_auprc", "mort_brier"]
+    t6 = doc.add_table(rows=len(model_order) + 1, cols=len(headers6))
     for j, h in enumerate(headers6):
         t6.rows[0].cells[j].paragraphs[0].add_run(h)
-    rows_t6 = [
-        ("Local-Only (Hospital 108)", "0.9986", "0.5636", "0.0956", "0.4772", "Local Only"),
-        ("No-GNN Ablation", "0.8076", "0.6768", "0.2867", "0.7889", "Centralized"),
-        ("Proposed FedGraph (Ours)", "0.8404", "0.5672", "0.0998", "0.5526", "Full Privacy"),
-    ]
-    for i, row in enumerate(rows_t6):
-        for j, val in enumerate(row):
+
+    def _fmt6(s):
+        return f"{s['mean']:.3f} ± {s['sd']:.3f}" if s['sd'] is not None else f"{s['mean']:.3f}"
+    for i, (key, label) in enumerate(model_order):
+        s = summary[key]
+        cells = [label] + [_fmt6(s[k]) for k in keys6]
+        for j, val in enumerate(cells):
             r = t6.rows[i + 1].cells[j].paragraphs[0].add_run(val)
-            if i == 2:  # Highlight our method
+            if i == 0:
                 r.bold = True
     style_table_professional(t6)
 
@@ -1693,35 +1811,40 @@ def build_report():
         "Key Findings from the Empirical Analysis:"
     ), bold=True, size=12, space_after=8)
     add_para(doc, (
-        "Finding 1 \u2014 Generalization Advantage: The Local-Only model exhibited severe generalizability "
-        "failure when evaluated on unseen hospitals, suffering a high test loss of 0.9986 and an inferior "
-        "sepsis AUROC of 0.4772 (worse than random guessing). In contrast, the proposed Federated Graph "
-        "model achieved a substantially lower test loss of 0.8404 and superior sepsis AUROC (0.5526). "
-        "This proves that collaborative federated optimization is indispensable for mitigating local "
-        "hospital overfitting."
+        "Finding 1 \u2014 Federated training helps, and more so for small hospitals: Both federated models "
+        "clearly beat all three local-only models on the test hospitals (in-hospital mortality AUROC "
+        "0.819 and 0.807, versus 0.769, 0.660 and 0.583 for local-only on hospitals of 1,562, 458 and 87 "
+        "patients). The local-only result drops sharply as the single hospital gets smaller, while the "
+        "federated models, which learn from 145 hospitals, stay strong. This is the clearest result of "
+        "the study."
     ))
     add_para(doc, (
-        "Finding 2 \u2014 Privacy Trade-Off Analysis: The centralized No-GNN model achieved higher raw "
-        "discrimination because it had unfettered cross-patient pooling. However, centralized pooling is "
-        "legally and ethically prohibited under HIPAA and GDPR in multi-institution settings. The proposed "
-        "Federated Graph model delivers competitive multi-task loss (0.8404 vs. 0.8076) while providing "
-        "absolute mathematical privacy compliance \u2014 a critical requirement for real-world deployment."
+        "Finding 2 \u2014 The graph gives a small, consistent gain: Adding the patient graph improves the "
+        "mean in-hospital mortality AUROC from 0.807 to 0.819 and the ICU mortality AUROC from 0.842 to "
+        "0.853. The gain is small and the standard-deviation bands overlap, but the GNN was at least as "
+        "good as the No-GNN model in every one of the three seeds and had lower variance, so on this task "
+        "the graph helps modestly rather than dramatically. We do not claim a large improvement from the "
+        "graph. Both federated models share the same training budget (same sampled clients, 6,945 optimizer "
+        "steps), so this comparison is like-for-like."
     ))
 
-    add_heading_2(doc, "8.5 Topological Graph Ablation Analysis")
+    add_heading_2(doc, "8.5 Patient Graph Visualization")
     add_para(doc, (
-        "To verify that the learned patient similarity graph captures clinically meaningful structure, "
-        "Figure 6 visualizes the graph topology constructed for Hospital 102. High-risk mortality patients "
-        "(highlighted in red) form distinct clusters connected by dense similarity edges, while stable "
-        "patients (green) populate distinct subgraphs. This topological segregation confirms that "
-        "intermediate multimodal fusion combined with cosine k-NN graph learning effectively isolates "
-        "acute decompensation phenotypes."
+        "Figure 6 shows the patient graph that the trained model actually builds on one held-out test "
+        "hospital (hospital 120, 68 patients with at least a 24-hour stay). Each node is coloured by the "
+        "model's predicted in-hospital mortality probability (green = low, red = high), and patients who "
+        "were recorded as dying in hospital are drawn with a dark red ring. Because the graph is built per "
+        "mini-batch of 32 patients, the nodes fall into a few dense clusters that correspond to the "
+        "batches. Within these clusters, most patients have low predicted risk, a few have higher "
+        "predicted risk, and the recorded deaths are a mix: some are predicted high-risk and some are not, "
+        "which is consistent with the moderate AUROC and low AUPRC in Table 6. The figure is a qualitative "
+        "illustration of the model output, not evidence of clean phenotype separation."
     ))
 
     fig6_path = ASSETS_DIR / "fig6_patient_graph_topology.png"
     if fig6_path.exists():
         add_image_centered(doc, fig6_path, width_inches=5.2)
-        add_figure_caption(doc, "Figure 6: Intra-Hospital Patient Similarity Graph Topology (Hospital 102)")
+        add_figure_caption(doc, "Figure 6: Patient similarity graph built by the trained model on test hospital 120 (node colour = predicted in-hospital mortality; red ring = recorded death)")
     doc.add_page_break()
 
     # ═════════════════════════════════════════════════════════════════════════
@@ -1731,49 +1854,56 @@ def build_report():
 
     add_heading_2(doc, "9.1 Summary of Contributions")
     add_para(doc, (
-        "This project successfully designed, implemented, and empirically validated an enterprise-grade "
-        "Federated Multimodal Graph Learning Framework for In-Hospital Mortality and Sepsis prediction "
-        "across 207 intensive care hospital sites from the eICU Collaborative Research Database. The "
-        "primary contributions of this work are summarized as follows:"
+        "This project designed and implemented a Federated Multimodal Graph Learning prototype for early "
+        "In-Hospital and ICU Mortality prediction, and evaluated it in a single-machine federated "
+        "simulation on the eICU Collaborative Research Database (207 hospitals). The main contributions "
+        "are summarized as follows:"
     ))
     add_para(doc, (
-        "Contribution 1 \u2014 Unified Multimodal Deep Architecture: We engineered specialized encoders "
-        "(Tabular MLP and Time-Series LSTM with packed padded sequence handling) that effectively project "
-        "static demographics (67D) and dynamic physiological trajectories (74D over 48 hours) into a "
-        "shared 128D latent space via intermediate non-linear fusion."
+        "Contribution 1 \u2014 Multimodal Architecture: We implemented a tabular MLP encoder and a time-series "
+        "LSTM encoder (with packed padded sequences) that project static variables (67D) and the first "
+        "24 hours of time series (74D, six 4-hour bins) into a shared 128D space through a non-linear "
+        "fusion layer, with the two modalities joined per patient by patient ID."
     ))
     add_para(doc, (
-        "Contribution 2 \u2014 Privacy-Preserving Intra-Hospital Patient Graphs: We proposed and "
-        "implemented an intra-hospital k-nearest neighbor patient similarity graph construction algorithm "
-        "that exploits non-Euclidean clinical correlations while strictly prohibiting cross-hospital edges, "
-        "guaranteeing full compliance with HIPAA, GDPR, and DPDPA regulations."
+        "Contribution 2 \u2014 Intra-Hospital Patient Graphs: We implemented a k-nearest neighbour patient "
+        "similarity graph built per mini-batch within a single hospital, so edges never connect patients "
+        "from different hospitals. In a real deployment this keeps graph construction local; in this "
+        "project the hospitals are simulated as separate clients in one process."
     ))
     add_para(doc, (
-        "Contribution 3 \u2014 Localized Graph Neural Network Modeling: We integrated PatientGNN "
-        "(supporting GraphSAGE, GAT, and GCN) to propagate localized phenotypic neighborhood messages, "
-        "enhanced with residual skip connections and empty-edge fallback mechanisms for robustness."
+        "Contribution 3 \u2014 Graph Neural Network: We integrated PatientGNN (GraphSAGE, GAT and GCN) with "
+        "residual connections to pass information between similar patients; the experiments use GraphSAGE. "
+        "The edge direction was corrected so that each patient aggregates messages from its own nearest "
+        "neighbours, and batches without edges fall back to each node's own features."
     ))
     add_para(doc, (
-        "Contribution 4 \u2014 Distributed Multi-Task Optimization: We implemented an end-to-end "
-        "multi-task objective with positive class weighting, demonstrating stable federated convergence "
-        "across communication rounds and proving that federated models drastically outperform isolated "
-        "hospital training on unseen patient cohorts."
+        "Contribution 4 \u2014 Federated Multi-Task Training and Honest Evaluation: We implemented an "
+        "end-to-end multi-task objective with positive-class weighting and FedAvg aggregation weighted by "
+        "the examples each client trained on. All models (federated GNN, No-GNN ablation and local-only "
+        "baselines) are trained with the same loop and the same checkpoint rule, and compared on 31 "
+        "held-out test hospitals never used in training or model selection (Chapter 8)."
     ))
 
     add_heading_2(doc, "9.2 Limitations of the Current Study")
     add_para(doc, (
-        "Despite its significant strengths, several limitations must be acknowledged for transparency "
-        "and future improvement:\n\n"
-        "\u2022 Static Similarity Graph: The patient graph is constructed once per batch using intermediate "
-        "fused embeddings, rather than evolving dynamically as physiological measurements unfold over the "
-        "48-hour observation window.\n\n"
-        "\u2022 Federated Aggregation Simplicity: The current server aggregation relies on standard FedAvg; "
-        "advanced personalization algorithms (e.g., FedProx, Ditto, pFedHN) could further mitigate extreme "
-        "hospital scale heterogeneity and improve convergence stability.\n\n"
-        "\u2022 Unimodal Text Exclusion: Due to dataset privacy constraints and data availability, "
-        "unstructured clinical progress notes were excluded from the multimodal scope.\n\n"
-        "\u2022 Limited Federated Rounds: Due to computational constraints, training was conducted over "
-        "5 communication rounds. Extended training with larger client samples may yield further improvements."
+        "Several limitations should be kept in mind when reading the results:\n\n"
+        "\u2022 Single-Machine Simulation: The federated setup runs in one Python process on one CPU. It does "
+        "not implement networking, secure aggregation or differential privacy, so no formal privacy "
+        "guarantee is claimed. The results show feasibility, not clinical validation.\n\n"
+        "\u2022 Batch-Level Graph: The patient graph is rebuilt per mini-batch of 32 patients rather than over "
+        "the whole hospital, so a patient's neighbours (and prediction) depend on which patients share its "
+        "batch. It is also static, not evolving over time within the 24-hour window.\n\n"
+        "\u2022 Diagnosis Feature Timing: The tabular diagnosis features are derived from the stay's diagnosis "
+        "table without a strict 24-hour cut-off. On a sample hospital they matched the first-24-hour "
+        "diagnoses about 99.6% of the time, so the effect is small, but a small amount of later information "
+        "may leak into these features.\n\n"
+        "\u2022 Simple Aggregation: The server uses standard FedAvg. Personalization methods (e.g., FedProx, "
+        "Ditto) could handle the large differences in hospital size better.\n\n"
+        "\u2022 Excluded Modalities: Unstructured clinical notes are not used; the model uses only the tabular "
+        "and time-series features in the processed eICU files.\n\n"
+        "\u2022 Threshold-Based Metrics: F1, precision and recall use a fixed 0.5 threshold, which is not tuned; "
+        "AUROC and AUPRC (threshold-free) are the main metrics."
     ))
 
     add_heading_2(doc, "9.3 Future Research Directions")
@@ -1788,17 +1918,18 @@ def build_report():
         "3. Attention-Based Cross-Modal Fusion: Replace intermediate concatenation fusion with multi-head "
         "cross-attention mechanisms enabling bidirectional conditioning between static and vital streams, "
         "potentially capturing more nuanced cross-modal clinical interactions.\n\n"
-        "4. Model Explainability: Implement GNNExplainer and Integrated Gradients to provide bedside "
-        "clinicians with interpretable visual rationales for predicted sepsis risk scores, facilitating "
-        "trust and adoption in clinical workflows.\n\n"
-        "5. Personalized Federated Learning: Explore per-hospital model personalization via meta-learning "
-        "approaches (e.g., MAML-FL) or mixture-of-experts architectures to better handle extreme "
-        "statistical heterogeneity across hospital sites."
+        "4. Genuine Sepsis Label: Add a clinically defined sepsis label (e.g., from the diagnosis and "
+        "microbiology tables with a fixed time horizon), rebuilding the infection-related input features to "
+        "avoid leakage, so that a sepsis task can be reported honestly alongside mortality.\n\n"
+        "5. Model Explainability: Apply methods such as GNNExplainer or Integrated Gradients to explain "
+        "individual risk predictions.\n\n"
+        "6. Personalized Federated Learning: Explore per-hospital personalization (e.g., FedProx, Ditto, "
+        "or meta-learning) to better handle the large differences in hospital size and case mix."
     ))
     doc.add_page_break()
 
     # ═════════════════════════════════════════════════════════════════════════
-    # REFERENCES (IEEE FORMAT - 26 REFERENCES)
+    # REFERENCES (IEEE FORMAT - 25 REFERENCES)
     # ═════════════════════════════════════════════════════════════════════════
     add_heading_1(doc, "REFERENCES")
     add_para(doc, "All references follow the IEEE citation standard as required by IIIT Bhopal project guidelines.",
@@ -1813,24 +1944,23 @@ def build_report():
         '[6] E. Choi, M. T. Bahadori, A. Schuetz, et al., "Doctor AI: Predicting Clinical Events via Recurrent Neural Networks," in Proc. JMLR Workshop and Conference, vol. 56, pp. 301\u2013318, 2016.',
         '[7] Z. C. Lipton, D. C. Kale, C. Elkan, and R. Wetzel, "Learning to Diagnose with LSTM Recurrent Neural Networks," in Proc. ICLR, 2016.',
         '[8] A. Vaswani, N. Shazeer, N. Parmar, et al., "Attention is all you need," in Advances in NeurIPS, vol. 30, pp. 5998\u20136008, 2017.',
-        '[9] Z. Rasmy, Y. Xiang, Z. Xie, et al., "Med-BERT: pretrained contextualized embeddings on large-scale structured electronic health records for disease prediction," npj Digital Medicine, vol. 4, no. 86, pp. 1\u201313, 2021.',
+        '[9] L. Rasmy, Y. Xiang, Z. Xie, C. Tao, and D. Zhi, "Med-BERT: pretrained contextualized embeddings on large-scale structured electronic health records for disease prediction," npj Digital Medicine, vol. 4, no. 86, May 2021.',
         '[10] Y. Li, S. Rao, J. R. A. Solares, et al., "BEHRT: Transformer for Electronic Health Records," Scientific Reports, vol. 10, no. 7155, pp. 1\u201312, Apr. 2020.',
         '[11] T. Baltru\u0161aitis, C. Ahuja, and L. P. Morency, "Multimodal Machine Learning: A Survey and Taxonomy," IEEE Trans. PAMI, vol. 41, no. 2, pp. 423\u2013443, Feb. 2019.',
         '[12] S. C. Huang, A. Pareek, S. Seyyedi, et al., "Fusion of medical imaging and electronic health records using deep learning: a systematic review," npj Digital Medicine, vol. 3, no. 136, pp. 1\u201314, Oct. 2020.',
-        '[13] B. Bardak and M. Tan, "Improving clinical outcome predictions using multimodal deep learning," IEEE J. Biomed. Health Inform., vol. 25, no. 6, pp. 2325\u20132333, Jun. 2021.',
+        '[13] B. Bardak and M. Tan, "Improving clinical outcome predictions using convolution over medical entities with multimodal learning," Artificial Intelligence in Medicine, vol. 117, art. no. 102112, 2021.',
         '[14] Z. Wu, S. Pan, F. Chen, et al., "A Comprehensive Survey on Graph Neural Networks," IEEE Trans. NNLS, vol. 32, no. 1, pp. 4\u201324, Jan. 2021.',
-        '[15] P. Pai and G. D. Bader, "Patient similarity networks for personalized medicine," npj Systems Biology and Applications, vol. 4, no. 37, pp. 1\u201312, Sep. 2018.',
+        '[15] S. Pai and G. D. Bader, "Patient similarity networks for precision medicine," Journal of Molecular Biology, vol. 430, no. 18, pp. 2924\u20132938, 2018.',
         '[16] T. N. Kipf and M. Welling, "Semi-Supervised Classification with Graph Convolutional Networks," in Proc. ICLR, 2017.',
         '[17] W. L. Hamilton, R. Ying, and J. Leskovec, "Inductive Representation Learning on Large Graphs," in Advances in NeurIPS, vol. 30, pp. 1024\u20131034, 2017.',
         '[18] P. Veli\u010dkovi\u0107, G. Cucurull, A. Casanova, et al., "Graph Attention Networks," in Proc. ICLR, 2018.',
-        '[19] E. Rocheteau, C. Li\u00f2, and P. Hyland, "Temporal Graph Neural Networks for Irregularly Sampled Clinical Time Series," in Proc. NeurIPS Workshop on GRL, 2021.',
+        '[19] E. Rocheteau, C. Tong, P. Veli\u010dkovi\u0107, N. Lane, and P. Li\u00f2, "Predicting patient outcomes with graph representation learning," arXiv:2101.03940, 2021.',
         '[20] B. McMahan, E. Moore, D. Ramage, et al., "Communication-Efficient Learning of Deep Networks from Decentralized Data," in Proc. AISTATS, pp. 1273\u20131282, 2017.',
         '[21] P. Kairouz, H. B. McMahan, B. Avent, et al., "Advances and open problems in federated learning," Foundations and Trends in ML, vol. 14, no. 1\u20132, pp. 1\u2013210, 2021.',
         '[22] N. Rieke, J. Hancox, W. Li, et al., "The future of digital health with federated learning," npj Digital Medicine, vol. 3, no. 119, pp. 1\u20137, Sep. 2020.',
         '[23] M. J. Sheller, B. Edwards, G. A. Reina, et al., "Federated learning in medicine: facilitating multi-institutional collaborations without sharing patient data," Scientific Reports, vol. 10, no. 12598, Jul. 2020.',
         '[24] I. Dayan, H. R. Roth, A. Zhong, et al., "Federated learning for predicting clinical outcomes in patients with COVID-19," Nature Medicine, vol. 27, no. 10, pp. 1735\u20131743, Oct. 2021.',
         '[25] T. J. Pollard, A. E. Johnson, J. D. Raffa, et al., "The eICU Collaborative Research Database," Scientific Data, vol. 5, no. 180178, pp. 1\u201313, Sep. 2018.',
-        '[26] F. Chollet et al., "Deep Learning Implementations for Critical Care Informatics," IEEE Trans. Med. Inform., vol. 40, no. 4, pp. 1120\u20131132, 2022.',
     ]
 
     for ref in references:
@@ -1845,14 +1975,12 @@ def build_report():
     # LIST OF PUBLICATIONS
     # ═════════════════════════════════════════════════════════════════════════
     add_heading_1(doc, "LIST OF PUBLICATIONS")
-    add_para(doc, "Manuscripts prepared and submitted based on this project work:",
+    add_para(doc, "Manuscript in preparation (not yet submitted) based on this project work:",
              size=12, italic=True, space_after=14)
 
     add_para(doc, (
         '1.  D. Savaliya, M. Patel, and Faculty Supervisor, "Federated Multimodal Graph Learning for '
-        'Privacy-Preserving Clinical Risk Stratification on eICU," Manuscript prepared for submission to '
-        'IEEE Journal of Biomedical and Health Informatics (J-BHI) / ACM Transactions on Computing for '
-        'Healthcare (HEALTH), 2026.'
+        'Privacy-Preserving Clinical Risk Stratification on eICU," manuscript in preparation, 2026.'
     ), size=12, space_after=24)
 
     doc.add_page_break()
@@ -1862,7 +1990,7 @@ def build_report():
     # ═════════════════════════════════════════════════════════════════════════
     add_heading_1(doc, "PLAGIARISM & AUTHENTICITY DECLARATION")
 
-    add_para(doc, "Turnitin Similarity & AI Verification Compliance Report",
+    add_para(doc, "Authenticity Declaration",
              size=12, italic=True, bold=True, space_after=14,
              align=WD_ALIGN_PARAGRAPH.CENTER)
 
@@ -1873,17 +2001,21 @@ def build_report():
     ), space_after=12)
 
     add_para(doc, (
-        "\u2022 Similarity Index: Guaranteed below 12% across Turnitin similarity verification engine.\n\n"
-        "\u2022 Original Figures & Diagrams: All architectural block diagrams (Figure 1), data flow diagrams "
-        "(Figure 2), hospital distribution charts (Figure 3), convergence trajectory plots (Figure 4), "
-        "comparative benchmark visualizations (Figure 5), and topological patient graph renderings (Figure 6) "
-        "are 100% original, self-designed, and generated directly from the project\u2019s source code and "
-        "experimental data artifacts.\n\n"
+        "\u2022 Similarity Index: The similarity score is the one given by the institute's official Turnitin "
+        "report for this document; no score is claimed here.\n\n"
+        "\u2022 Figures: Figures 1 and 2 are diagrams drawn with matplotlib. Figures 3 to 6 are generated by "
+        "scripts/generate_report_figures.py from the processed eICU data and from the saved experiment "
+        "outputs in results/corrected/ (Figure 6 shows the graph built by the trained model, with "
+        "anonymous patient labels).\n\n"
         "\u2022 Code Authenticity: All source code modules (datasets.py, encoders.py, fusion.py, "
         "graph_builder.py, gnn.py, models.py, train_federated.py, benchmark_baselines.py) represent "
         "original engineering work implemented by the project investigators.\n\n"
-        "\u2022 Data Attribution: The eICU Collaborative Research Database [25] is publicly available and "
-        "has been cited in accordance with its data use agreement.\n\n"
+        "\u2022 Data Attribution: The eICU Collaborative Research Database [25] is available to credentialed "
+        "researchers through PhysioNet under a data use agreement. No patient-level records or patient "
+        "identifiers are reproduced in this report.\n\n"
+        "\u2022 AI Assistance: An AI coding assistant (Claude, Anthropic) was used to audit the code, correct "
+        "errors and revise this report. All reported results come from running the code in the project "
+        "repository.\n\n"
         "\u2022 Overall Authenticity: The text, code implementations, mathematical formulations, and "
         "experimental results presented in this document represent bonafide academic and engineering "
         "contributions carried out exclusively by the project investigators."
@@ -1917,7 +2049,7 @@ def build_report():
     print(f"  Total Sections: 9 Chapters + Front Matter + References")
     print(f"  Tables: 8 professional tables with borders")
     print(f"  Figures: 6 publication-quality illustrations")
-    print(f"  References: 26 (IEEE Format)")
+    print(f"  References: 25 (IEEE Format)")
     print(f"{'='*70}\n")
 
 

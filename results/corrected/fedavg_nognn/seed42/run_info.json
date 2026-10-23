@@ -1,0 +1,31 @@
+{
+  "script": "train_federated.py",
+  "run_name": "fedavg_nognn",
+  "task": "predict in-hospital and ICU mortality from the first 24 h of the ICU stay (patients still in the ICU at 24 h)",
+  "git_commit": "b146d0cda1d0f4fc0b2120b1301f3c12d126b6a2",
+  "uncommitted_code_changes": true,
+  "args": {
+    "rounds": 50,
+    "local_epochs": 1,
+    "clients_per_round": 10,
+    "gnn_type": "sage",
+    "batch_size": 32,
+    "lr": 0.001,
+    "knn_k": 5,
+    "val_fraction": 0.15,
+    "test_fraction": 0.15,
+    "no_gnn": true,
+    "train_hospitals": null,
+    "out_dir": "C:\\minorProject\\results\\corrected\\fedavg_nognn\\seed42",
+    "seed": 42,
+    "split_seed": 42
+  },
+  "split_file": "hospital_split.json",
+  "n_hospitals": {
+    "train": 145,
+    "val": 31,
+    "test": 31
+  },
+  "n_val_patients": 21100,
+  "checkpoint_selection": "round with the lowest validation loss"
+}

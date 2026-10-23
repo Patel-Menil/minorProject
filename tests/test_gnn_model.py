@@ -70,7 +70,7 @@ def test_end_to_end_model_and_loss():
     print("\n--- Test 2: End-to-End FederatedPatientModel on Hospital 102 ---")
 
     # 1. Load Data
-    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH, max_seq_len=48)
+    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH)
 
     batch_size = 16
     tab_feats, seqs, lens, targets, pids = next(iter(DataLoader(ds, batch_size=batch_size, shuffle=False)))

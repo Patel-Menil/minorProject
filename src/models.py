@@ -127,6 +127,9 @@ class FederatedPatientModel(nn.Module):
         Default k for dynamic k-NN patient graph construction (default: 5).
     dropout : float
         Dropout probability (default: 0.3).
+    use_gnn : bool
+        If False (No-GNN ablation), no patient graph is built and the heads
+        read the fused embedding directly. Everything else is identical.
     """
 
     def __init__(
@@ -142,10 +145,12 @@ class FederatedPatientModel(nn.Module):
         gnn_layers: int = 2,
         knn_k: int = 5,
         dropout: float = 0.3,
+        use_gnn: bool = True,
     ) -> None:
         super().__init__()
 
         self.knn_k = knn_k
+        self.use_gnn = use_gnn
 
         # ── Step 2: Encoders ─────────────────────────────────────────────
         self.tabular_encoder = TabularEncoder(
@@ -170,19 +175,20 @@ class FederatedPatientModel(nn.Module):
         )
 
         # ── Step 5: Patient Graph Neural Network ─────────────────────────
-        self.gnn = PatientGNN(
-            in_channels=fused_dim,
-            hidden_channels=gnn_hidden_dim,
-            out_channels=gnn_out_dim,
-            num_layers=gnn_layers,
-            model_type=gnn_type,
-            dropout=dropout,
-            residual=True,
-        )
+        if use_gnn:
+            self.gnn = PatientGNN(
+                in_channels=fused_dim,
+                hidden_channels=gnn_hidden_dim,
+                out_channels=gnn_out_dim,
+                num_layers=gnn_layers,
+                model_type=gnn_type,
+                dropout=dropout,
+                residual=True,
+            )
 
         # ── Step 6: Multi-Task Prediction Heads ──────────────────────────
         self.heads = MultiTaskPredictionHeads(
-            in_channels=gnn_out_dim,
+            in_channels=gnn_out_dim if use_gnn else fused_dim,
             hidden_dim=32,
             dropout=dropout,
         )
@@ -228,13 +234,17 @@ class FederatedPatientModel(nn.Module):
         # 2. Multimodal Fusion
         fused_emb = self.fusion(tab_emb, ts_emb)
 
-        # 3. Graph Construction (if not precomputed)
-        if edge_index is None:
-            k = knn_k if knn_k is not None else self.knn_k
-            edge_index, edge_weight = build_knn_graph(fused_emb, k=k, metric="cosine")
+        if self.use_gnn:
+            # 3. Graph Construction (if not precomputed)
+            if edge_index is None:
+                k = knn_k if knn_k is not None else self.knn_k
+                edge_index, edge_weight = build_knn_graph(fused_emb, k=k, metric="cosine")
 
-        # 4. Graph Representation Learning (GNN)
-        graph_emb = self.gnn(fused_emb, edge_index, edge_weight)
+            # 4. Graph Representation Learning (GNN)
+            graph_emb = self.gnn(fused_emb, edge_index, edge_weight)
+        else:
+            # No-GNN ablation: each patient is predicted from its own embedding only
+            graph_emb, edge_index, edge_weight = fused_emb, None, None
 
         # 5. Multi-task Prediction
         mortality_logits, icu_logits = self.heads(graph_emb)

@@ -3,19 +3,22 @@ train_federated.py
 ------------------
 Steps 7 & 8: Federated Learning Pipeline for Multimodal Patient Graph Learning.
 
-Simulates a federated learning network across 208 hospital clients:
+Simulates (in one process) a federated network over the training-split hospitals:
 1. Server distributes global model parameters to sampled hospital clients.
-2. Each hospital client constructs its local intra-hospital patient graph.
+2. Each hospital client builds its patient graph (k-NN within each batch).
 3. Hospital clients train the end-to-end model (Encoders + Fusion + GNN + Multi-Task Heads)
-   locally using MultiTaskLoss (privacy preserved: data never leaves the hospital).
-4. Central server aggregates local weight updates using FedAvg (weighted by patient count).
+   locally using MultiTaskLoss; raw rows are not sent to the server in this simulation.
+4. Central server aggregates local weight updates using FedAvg (weighted by examples trained).
 5. Global model is scored on validation hospitals each round to pick the best checkpoint
    (test hospitals are left for benchmark_baselines.py).
-6. Saves best model weights to `results/corrected/global_federated_model.pth`.
+6. Saves the best checkpoint to `results/corrected/<run name>/seed<seed>/`.
 
 Usage
 -----
-    python scripts/train_federated.py
+    python scripts/train_federated.py                                  # FedAvg + GNN
+    python scripts/train_federated.py --no-gnn                         # No-GNN ablation
+    python scripts/train_federated.py --train-hospitals hospital_61    # local-only baseline
+    python scripts/run_experiments.py                                  # all runs, 3 seeds
 """
 
 import copy
@@ -36,6 +39,7 @@ from torch.utils.data import DataLoader
 from src.datasets import (
     EICUTabularDataset,
     EICUTimeSeriesDataset,
+    OBS_HOURS,
     load_hospital_dataset,
 )
 from src.evaluation import evaluate_model
@@ -104,7 +108,7 @@ def train_local_client(
     FedAvg weights clients by "examples", not by cohort size.
     """
     # Load hospital's local data, tabular + time-series paired by patient ID
-    ds = load_hospital_dataset(hospital_dir, stats_path=stats_path, max_seq_len=48)
+    ds = load_hospital_dataset(hospital_dir, stats_path=stats_path)
     stats = {"patients": len(ds), "examples": 0, "steps": 0, "patient_ids": set()}
     if len(ds) < 2:
         return global_model.state_dict(), stats  # 0 examples -> zero weight in FedAvg
@@ -196,18 +200,29 @@ def main() -> None:
     import argparse
 
     parser = argparse.ArgumentParser(description="Federated Multimodal Graph Learning for eICU")
-    parser.add_argument("--rounds", type=int, default=5, help="Number of federated communication rounds")
+    parser.add_argument("--rounds", type=int, default=50, help="Number of federated communication rounds")
     parser.add_argument("--local-epochs", type=int, default=1, help="Number of local training epochs per client")
-    parser.add_argument("--clients-per-round", type=int, default=6, help="Number of hospital clients sampled per round")
+    parser.add_argument("--clients-per-round", type=int, default=10, help="Number of hospital clients sampled per round")
     parser.add_argument("--gnn-type", type=str, default="sage", choices=["sage", "gat", "gcn"], help="GNN architecture")
     parser.add_argument("--batch-size", type=int, default=32, help="Client batch size")
     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
     parser.add_argument("--knn-k", type=int, default=5, help="Number of nearest neighbors for patient graph")
     parser.add_argument("--val-fraction", type=float, default=0.15, help="Fraction of hospitals for validation (checkpoint selection)")
     parser.add_argument("--test-fraction", type=float, default=0.15, help="Fraction of hospitals held out for the final benchmark")
-    parser.add_argument("--out-dir", type=pathlib.Path, default=OUTPUT_DIR, help="Folder for the checkpoint, history and run info")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+    parser.add_argument("--no-gnn", action="store_true", help="No-GNN ablation: same training, no patient graph")
+    parser.add_argument("--train-hospitals", nargs="+", default=None,
+                        help="Restrict clients to these training-split hospitals (e.g. one hospital = local-only baseline)")
+    parser.add_argument("--out-dir", type=pathlib.Path, default=None,
+                        help="Folder for the checkpoint, history and run info (default: results/corrected/<run name>/seed<seed>)")
+    parser.add_argument("--seed", type=int, default=42, help="Training seed (model init, client sampling, batch order)")
+    parser.add_argument("--split-seed", type=int, default=42, help="Seed of the fixed hospital split (keep at 42)")
     args = parser.parse_args()
+
+    if args.train_hospitals:
+        run_name = "local_" + "_".join(h.replace("hospital_", "") for h in args.train_hospitals)
+    else:
+        run_name = "fedavg_nognn" if args.no_gnn else "fedavg_gnn"
+    args.out_dir = args.out_dir or OUTPUT_DIR / run_name / f"seed{args.seed}"
 
     random.seed(args.seed)
     np.random.seed(args.seed)
@@ -216,13 +231,21 @@ def main() -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("=" * 70)
     print(" 🏥 Federated Multimodal Graph Learning - In-Hospital & ICU Mortality Prediction")
-    print(f" Device: {device} | GNN: {args.gnn_type.upper()} | Rounds: {args.rounds} | Clients/Round: {args.clients_per_round}")
+    gnn_label = "none" if args.no_gnn else args.gnn_type.upper()
+    print(f" Run: {run_name} | Seed: {args.seed} | Device: {device} | GNN: {gnn_label} | "
+          f"Rounds: {args.rounds} | Clients/Round: {args.clients_per_round}")
     print("=" * 70)
 
     # 1-2. Fixed hospital split shared with benchmark_baselines.py.
     # Test hospitals are never loaded here: they are only for the final benchmark.
-    split = load_or_create_split(HOSPITALS_DIR, SPLIT_PATH, args.seed, args.val_fraction, args.test_fraction)
+    split = load_or_create_split(HOSPITALS_DIR, SPLIT_PATH, args.split_seed, args.val_fraction, args.test_fraction)
     train_hospitals, val_hospitals = split["train"], split["val"]
+    if args.train_hospitals:
+        chosen = [HOSPITALS_DIR / h for h in args.train_hospitals]
+        not_train = [h.name for h in chosen if h not in train_hospitals]
+        if not_train:
+            raise ValueError(f"Not training-split hospitals: {not_train}")
+        train_hospitals = chosen
 
     print(f"\nHospital split ({SPLIT_PATH.name}):")
     print(f"  Training Hospitals   : {len(train_hospitals)}")
@@ -230,7 +253,7 @@ def main() -> None:
     print(f"  Test Hospitals       : {len(split['test'])} (not used during training)")
 
     # Load validation hospitals once; every round is scored on all of them
-    val_datasets = [load_hospital_dataset(h, stats_path=STATS_PATH, max_seq_len=48) for h in val_hospitals]
+    val_datasets = [load_hospital_dataset(h, stats_path=STATS_PATH) for h in val_hospitals]
     print(f"  Validation Patients  : {sum(len(d) for d in val_datasets)}")
 
     # 3. Detect input dimensions from first hospital
@@ -255,6 +278,7 @@ def main() -> None:
         gnn_layers=GNN_LAYERS,
         knn_k=args.knn_k,
         dropout=DROPOUT,
+        use_gnn=not args.no_gnn,
     ).to(device)
 
     total_params = sum(p.numel() for p in global_model.parameters() if p.requires_grad)
@@ -279,6 +303,8 @@ def main() -> None:
     with open(args.out_dir / "run_info.json", "w") as f:
         json.dump({
             "script": "train_federated.py",
+            "run_name": run_name,
+            "task": f"predict in-hospital and ICU mortality from the first {OBS_HOURS} h of the ICU stay (patients still in the ICU at {OBS_HOURS} h)",
             "git_commit": commit,
             "uncommitted_code_changes": dirty,
             "args": {k: str(v) if isinstance(v, pathlib.Path) else v for k, v in vars(args).items()},
@@ -292,9 +318,13 @@ def main() -> None:
     print(f" Starting Federated Training ({args.rounds} Communication Rounds)")
     print("=" * 70)
 
+    # Own generator for client sampling: runs with the same seed and hospital pool
+    # (e.g. GNN vs No-GNN) sample exactly the same clients in every round
+    client_rng = random.Random(args.seed)
+
     for round_idx in range(1, args.rounds + 1):
         # Sample subset of hospitals for this round
-        sampled_hospitals = random.sample(train_hospitals, min(len(train_hospitals), args.clients_per_round))
+        sampled_hospitals = client_rng.sample(train_hospitals, min(len(train_hospitals), args.clients_per_round))
 
         client_updates = []
         round_patients = round_examples = round_steps = failed_clients = 0
@@ -344,10 +374,14 @@ def main() -> None:
                 "timeseries_dim": timeseries_dim,
                 "gnn_type": args.gnn_type,
                 "knn_k": args.knn_k,
+                "use_gnn": not args.no_gnn,
+                "run_name": run_name,
+                "seed": args.seed,
             }, save_path)
 
         round_record = {
             "round": round_idx,
+            "sampled_hospitals": [h.name for h in sampled_hospitals],
             "clients": len(client_updates),
             "failed_clients": failed_clients,
             "cohort_patients": round_patients,          # sum of sampled hospitals' sizes

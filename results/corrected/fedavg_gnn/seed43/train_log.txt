@@ -1,0 +1,77 @@
+C:\Users\menil\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\torch\jit\_script.py:1485: FutureWarning: `torch.jit.script` is not supported in Python 3.14+ and may break. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+======================================================================
+ 🏥 Federated Multimodal Graph Learning - In-Hospital & ICU Mortality Prediction
+ Run: fedavg_gnn | Seed: 43 | Device: cpu | GNN: SAGE | Rounds: 50 | Clients/Round: 10
+======================================================================
+
+Hospital split (hospital_split.json):
+  Training Hospitals   : 145
+  Validation Hospitals : 31 (checkpoint selection only)
+  Test Hospitals       : 31 (not used during training)
+  Validation Patients  : 21100
+  Tabular Input Dim    : 67
+  Time-series Input Dim: 74
+  Global Model Params  : 165,826
+
+======================================================================
+ Starting Federated Training (50 Communication Rounds)
+======================================================================
+ Round  1/50 | Clients: 10 (5210 examples, 165 steps) | Loss: 1.0673 | Mort AUROC: 0.6697 (AUPRC: 0.1693) | ICU AUROC: 0.6895 🌟 [BEST]
+ Round  2/50 | Clients: 10 (4116 examples, 133 steps) | Loss: 0.9079 | Mort AUROC: 0.6981 (AUPRC: 0.2050) | ICU AUROC: 0.7009 🌟 [BEST]
+ Round  3/50 | Clients: 10 (2702 examples, 89 steps) | Loss: 0.7891 | Mort AUROC: 0.7146 (AUPRC: 0.2237) | ICU AUROC: 0.6834 🌟 [BEST]
+ Round  4/50 | Clients: 10 (4659 examples, 150 steps) | Loss: 0.6844 | Mort AUROC: 0.7374 (AUPRC: 0.2417) | ICU AUROC: 0.7424 🌟 [BEST]
+ Round  5/50 | Clients: 10 (5263 examples, 167 steps) | Loss: 0.6286 | Mort AUROC: 0.7577 (AUPRC: 0.2768) | ICU AUROC: 0.7736 🌟 [BEST]
+ Round  6/50 | Clients: 10 (4035 examples, 131 steps) | Loss: 0.5966 | Mort AUROC: 0.7715 (AUPRC: 0.2939) | ICU AUROC: 0.7908 🌟 [BEST]
+ Round  7/50 | Clients: 10 (4738 examples, 152 steps) | Loss: 0.5612 | Mort AUROC: 0.7743 (AUPRC: 0.3043) | ICU AUROC: 0.7949 🌟 [BEST]
+ Round  8/50 | Clients: 10 (3902 examples, 126 steps) | Loss: 0.5718 | Mort AUROC: 0.7845 (AUPRC: 0.3176) | ICU AUROC: 0.8043
+ Round  9/50 | Clients: 10 (4588 examples, 147 steps) | Loss: 0.5183 | Mort AUROC: 0.7964 (AUPRC: 0.3260) | ICU AUROC: 0.8181 🌟 [BEST]
+ Round 10/50 | Clients: 10 (4944 examples, 157 steps) | Loss: 0.5131 | Mort AUROC: 0.7976 (AUPRC: 0.3319) | ICU AUROC: 0.8207 🌟 [BEST]
+ Round 11/50 | Clients: 10 (5694 examples, 181 steps) | Loss: 0.5144 | Mort AUROC: 0.8054 (AUPRC: 0.3448) | ICU AUROC: 0.8331
+ Round 12/50 | Clients: 10 (4445 examples, 143 steps) | Loss: 0.5262 | Mort AUROC: 0.8107 (AUPRC: 0.3511) | ICU AUROC: 0.8367
+ Round 13/50 | Clients: 10 (3037 examples, 98 steps) | Loss: 0.4770 | Mort AUROC: 0.8114 (AUPRC: 0.3552) | ICU AUROC: 0.8365 🌟 [BEST]
+ Round 14/50 | Clients: 10 (6192 examples, 196 steps) | Loss: 0.4999 | Mort AUROC: 0.8150 (AUPRC: 0.3526) | ICU AUROC: 0.8425
+ Round 15/50 | Clients: 10 (3334 examples, 109 steps) | Loss: 0.4845 | Mort AUROC: 0.8110 (AUPRC: 0.3555) | ICU AUROC: 0.8363
+ Round 16/50 | Clients: 10 (4989 examples, 160 steps) | Loss: 0.4843 | Mort AUROC: 0.8077 (AUPRC: 0.3484) | ICU AUROC: 0.8367
+ Round 17/50 | Clients: 10 (4811 examples, 154 steps) | Loss: 0.5330 | Mort AUROC: 0.8063 (AUPRC: 0.3442) | ICU AUROC: 0.8369
+ Round 18/50 | Clients: 10 (4019 examples, 130 steps) | Loss: 0.5436 | Mort AUROC: 0.8106 (AUPRC: 0.3489) | ICU AUROC: 0.8395
+ Round 19/50 | Clients: 10 (5862 examples, 186 steps) | Loss: 0.5368 | Mort AUROC: 0.8132 (AUPRC: 0.3546) | ICU AUROC: 0.8351
+ Round 20/50 | Clients: 10 (4207 examples, 136 steps) | Loss: 0.4806 | Mort AUROC: 0.8087 (AUPRC: 0.3516) | ICU AUROC: 0.8288
+ Round 21/50 | Clients: 10 (4264 examples, 137 steps) | Loss: 0.4983 | Mort AUROC: 0.8083 (AUPRC: 0.3533) | ICU AUROC: 0.8286
+ Round 22/50 | Clients: 10 (3853 examples, 124 steps) | Loss: 0.4715 | Mort AUROC: 0.8123 (AUPRC: 0.3588) | ICU AUROC: 0.8284 🌟 [BEST]
+ Round 23/50 | Clients: 10 (3118 examples, 103 steps) | Loss: 0.4883 | Mort AUROC: 0.7918 (AUPRC: 0.3450) | ICU AUROC: 0.8239
+ Round 24/50 | Clients: 10 (5781 examples, 183 steps) | Loss: 0.5143 | Mort AUROC: 0.8094 (AUPRC: 0.3585) | ICU AUROC: 0.8341
+ Round 25/50 | Clients: 10 (5604 examples, 180 steps) | Loss: 0.5130 | Mort AUROC: 0.8109 (AUPRC: 0.3607) | ICU AUROC: 0.8346
+ Round 26/50 | Clients: 10 (2176 examples, 72 steps) | Loss: 0.5293 | Mort AUROC: 0.8045 (AUPRC: 0.3497) | ICU AUROC: 0.8346
+ Round 27/50 | Clients: 10 (6396 examples, 202 steps) | Loss: 0.5416 | Mort AUROC: 0.8137 (AUPRC: 0.3591) | ICU AUROC: 0.8434
+ Round 28/50 | Clients: 10 (3994 examples, 129 steps) | Loss: 0.4861 | Mort AUROC: 0.8145 (AUPRC: 0.3612) | ICU AUROC: 0.8412
+ Round 29/50 | Clients: 10 (4290 examples, 138 steps) | Loss: 0.4808 | Mort AUROC: 0.8131 (AUPRC: 0.3591) | ICU AUROC: 0.8375
+ Round 30/50 | Clients: 10 (6961 examples, 220 steps) | Loss: 0.4846 | Mort AUROC: 0.8124 (AUPRC: 0.3584) | ICU AUROC: 0.8404
+ Round 31/50 | Clients: 10 (5330 examples, 169 steps) | Loss: 0.5159 | Mort AUROC: 0.8068 (AUPRC: 0.3536) | ICU AUROC: 0.8334
+ Round 32/50 | Clients: 10 (4958 examples, 157 steps) | Loss: 0.4591 | Mort AUROC: 0.8090 (AUPRC: 0.3576) | ICU AUROC: 0.8341 🌟 [BEST]
+ Round 33/50 | Clients: 10 (2993 examples, 98 steps) | Loss: 0.4953 | Mort AUROC: 0.8075 (AUPRC: 0.3548) | ICU AUROC: 0.8347
+ Round 34/50 | Clients: 10 (5472 examples, 173 steps) | Loss: 0.5387 | Mort AUROC: 0.8128 (AUPRC: 0.3557) | ICU AUROC: 0.8381
+ Round 35/50 | Clients: 10 (5746 examples, 183 steps) | Loss: 0.4764 | Mort AUROC: 0.8041 (AUPRC: 0.3497) | ICU AUROC: 0.8306
+ Round 36/50 | Clients: 10 (5812 examples, 185 steps) | Loss: 0.5152 | Mort AUROC: 0.8092 (AUPRC: 0.3492) | ICU AUROC: 0.8373
+ Round 37/50 | Clients: 10 (4363 examples, 140 steps) | Loss: 0.5425 | Mort AUROC: 0.8088 (AUPRC: 0.3561) | ICU AUROC: 0.8350
+ Round 38/50 | Clients: 10 (4912 examples, 158 steps) | Loss: 0.5346 | Mort AUROC: 0.8107 (AUPRC: 0.3601) | ICU AUROC: 0.8345
+ Round 39/50 | Clients: 10 (3884 examples, 125 steps) | Loss: 0.5147 | Mort AUROC: 0.8043 (AUPRC: 0.3537) | ICU AUROC: 0.8290
+ Round 40/50 | Clients: 10 (4285 examples, 137 steps) | Loss: 0.5309 | Mort AUROC: 0.8101 (AUPRC: 0.3587) | ICU AUROC: 0.8357
+ Round 41/50 | Clients: 10 (4565 examples, 146 steps) | Loss: 0.5388 | Mort AUROC: 0.8110 (AUPRC: 0.3632) | ICU AUROC: 0.8338
+ Round 42/50 | Clients: 10 (5986 examples, 190 steps) | Loss: 0.5129 | Mort AUROC: 0.8127 (AUPRC: 0.3598) | ICU AUROC: 0.8363
+ Round 43/50 | Clients: 10 (5867 examples, 188 steps) | Loss: 0.5126 | Mort AUROC: 0.8124 (AUPRC: 0.3648) | ICU AUROC: 0.8394
+ Round 44/50 | Clients: 10 (3157 examples, 103 steps) | Loss: 0.5678 | Mort AUROC: 0.8117 (AUPRC: 0.3594) | ICU AUROC: 0.8364
+ Round 45/50 | Clients: 10 (3770 examples, 122 steps) | Loss: 0.4814 | Mort AUROC: 0.8172 (AUPRC: 0.3681) | ICU AUROC: 0.8436
+ Round 46/50 | Clients: 10 (3649 examples, 119 steps) | Loss: 0.4850 | Mort AUROC: 0.8114 (AUPRC: 0.3582) | ICU AUROC: 0.8375
+ Round 47/50 | Clients: 10 (3637 examples, 118 steps) | Loss: 0.4795 | Mort AUROC: 0.8152 (AUPRC: 0.3647) | ICU AUROC: 0.8412
+ Round 48/50 | Clients: 10 (4100 examples, 132 steps) | Loss: 0.5077 | Mort AUROC: 0.8145 (AUPRC: 0.3608) | ICU AUROC: 0.8381
+ Round 49/50 | Clients: 10 (3621 examples, 117 steps) | Loss: 0.5346 | Mort AUROC: 0.8139 (AUPRC: 0.3660) | ICU AUROC: 0.8390
+ Round 50/50 | Clients: 10 (3012 examples, 99 steps) | Loss: 0.4975 | Mort AUROC: 0.8128 (AUPRC: 0.3639) | ICU AUROC: 0.8380
+
+======================================================================
+ ✅ Federated Learning Completed Successfully!
+ Best Validation Loss: 0.4591
+ Unique patients used in training: 81545
+ Global Model Saved to   : C:\minorProject\results\corrected\fedavg_gnn\seed43\global_federated_model.pth
+ Training History Saved to: C:\minorProject\results\corrected\fedavg_gnn\seed43\training_history.json
+======================================================================

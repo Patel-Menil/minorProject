@@ -44,7 +44,7 @@ def make_hospital(root: pathlib.Path, tab_pids, ts_pids) -> pathlib.Path:
         "hospital_expired": [p % 2 for p in tab_pids],
         "icu_expired": [1 - p % 2 for p in tab_pids],
         "hospitaldischargeoffset": [100.0] * len(tab_pids),
-        "unitdischargeoffset": [50.0] * len(tab_pids),
+        "unitdischargeoffset": [2000.0] * len(tab_pids),  # minutes; > 24 h so all are in the cohort
     }).to_parquet(hdir / "tabular" / "tabular_features.parquet")
     rows = [(p, h, float(p)) for p in ts_pids for h in range(1 + p % 3)]
     pd.DataFrame(rows, columns=["patientunitstayid", "hour_bin", "lab_pid"]).to_parquet(
@@ -95,6 +95,26 @@ def test_patient_missing_a_modality_is_dropped(tmp_path):
     ds = load_hospital_dataset(hdir)
     assert ds.num_dropped == 2
     assert set(ds.patient_ids.tolist()) == set(PIDS[:-2])
+
+
+def test_24h_window_and_cohort(tmp_path):
+    """Only patients still in the ICU at 24 h; only time-steps from the first 24 h (bins 0-5)."""
+    hdir = make_hospital(tmp_path, PIDS, PIDS)
+    tab = pd.read_parquet(hdir / "tabular" / "tabular_features.parquet")
+    tab.loc[tab.patientunitstayid == 13, "unitdischargeoffset"] = 600.0  # left the ICU after 10 h
+    tab.to_parquet(hdir / "tabular" / "tabular_features.parquet")
+    rows = [(907, h, float(h)) for h in range(10)]  # bins 0-9 = 40 h of data
+    rows += [(p, 0, float(p)) for p in PIDS if p != 907]
+    pd.DataFrame(rows, columns=["patientunitstayid", "hour_bin", "lab_pid"]).to_parquet(
+        hdir / "timeseries" / "timeseries_features.parquet"
+    )
+
+    ds = load_hospital_dataset(hdir)
+    assert 13 not in ds.patient_ids.tolist() and len(ds) == len(PIDS) - 1
+    i = ds.patient_ids.tolist().index(907)
+    _, ts_x, length, _, _ = ds[i]
+    assert ts_x.shape[0] == 6 and length == 6  # 6 bins of 4 h
+    assert ts_x[:, 0].tolist() == [0.0, 1.0, 2.0, 3.0, 4.0, 5.0]  # bins 6-9 (after 24 h) are not used
 
 
 def test_duplicate_patient_ids_raise(tmp_path):
