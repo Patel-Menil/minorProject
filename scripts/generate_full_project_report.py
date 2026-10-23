@@ -1994,12 +1994,10 @@ def build_report():
     # LIST OF PUBLICATIONS
     # ═════════════════════════════════════════════════════════════════════════
     add_heading_1(doc, "LIST OF PUBLICATIONS")
-    add_para(doc, "Manuscript in preparation (not yet submitted) based on this project work:",
-             size=12, italic=True, space_after=14)
-
+    # The guideline asks only for accepted / submitted / published papers ("If Any")
     add_para(doc, (
-        '1.  D. Savaliya, M. Patel, and Faculty Supervisor, "Federated Multimodal Graph Learning for '
-        'Privacy-Preserving Clinical Risk Stratification on eICU," manuscript in preparation, 2026.'
+        "Not applicable. No paper based on this project work has been submitted, accepted, or "
+        "published at the time of this report."
     ), size=12, space_after=24)
 
     page_break(doc)
