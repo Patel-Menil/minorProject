@@ -1,0 +1,633 @@
+{
+  "protocol": {
+    "task": "predict in-hospital and ICU mortality from the first 24 h of the ICU stay (patients still in the ICU at 24 h)",
+    "split_file": "hospital_split.json",
+    "n_hospitals": {
+      "train": 145,
+      "val": 31,
+      "test": 31
+    },
+    "evaluated_on": "test hospitals (never used for training or checkpoint selection)",
+    "checkpoint_selection": "each run: round with the lowest loss on the validation hospitals",
+    "auprc": "average precision (sklearn)"
+  },
+  "summary": {
+    "fedavg_gnn": {
+      "n_seeds": 3,
+      "mort_auroc": {
+        "mean": 0.8191,
+        "sd": 0.0074
+      },
+      "mort_auprc": {
+        "mean": 0.4003,
+        "sd": 0.0085
+      },
+      "mort_brier": {
+        "mean": 0.0747,
+        "sd": 0.0025
+      },
+      "icu_auroc": {
+        "mean": 0.8532,
+        "sd": 0.0053
+      },
+      "icu_auprc": {
+        "mean": 0.3365,
+        "sd": 0.0075
+      },
+      "icu_brier": {
+        "mean": 0.0461,
+        "sd": 0.0009
+      },
+      "loss": {
+        "mean": 0.4417,
+        "sd": 0.012
+      }
+    },
+    "fedavg_nognn": {
+      "n_seeds": 3,
+      "mort_auroc": {
+        "mean": 0.8065,
+        "sd": 0.024
+      },
+      "mort_auprc": {
+        "mean": 0.3794,
+        "sd": 0.038
+      },
+      "mort_brier": {
+        "mean": 0.0778,
+        "sd": 0.0035
+      },
+      "icu_auroc": {
+        "mean": 0.8421,
+        "sd": 0.015
+      },
+      "icu_auprc": {
+        "mean": 0.3272,
+        "sd": 0.0177
+      },
+      "icu_brier": {
+        "mean": 0.0475,
+        "sd": 0.0018
+      },
+      "loss": {
+        "mean": 0.4531,
+        "sd": 0.0198
+      }
+    },
+    "local_183": {
+      "n_seeds": 3,
+      "mort_auroc": {
+        "mean": 0.7687,
+        "sd": 0.0182
+      },
+      "mort_auprc": {
+        "mean": 0.3061,
+        "sd": 0.033
+      },
+      "mort_brier": {
+        "mean": 0.0977,
+        "sd": 0.0034
+      },
+      "icu_auroc": {
+        "mean": 0.7893,
+        "sd": 0.0267
+      },
+      "icu_auprc": {
+        "mean": 0.2239,
+        "sd": 0.0452
+      },
+      "icu_brier": {
+        "mean": 0.0583,
+        "sd": 0.0027
+      },
+      "loss": {
+        "mean": 0.5475,
+        "sd": 0.027
+      }
+    },
+    "local_396": {
+      "n_seeds": 3,
+      "mort_auroc": {
+        "mean": 0.6599,
+        "sd": 0.0356
+      },
+      "mort_auprc": {
+        "mean": 0.2077,
+        "sd": 0.0239
+      },
+      "mort_brier": {
+        "mean": 0.0883,
+        "sd": 0.0042
+      },
+      "icu_auroc": {
+        "mean": 0.68,
+        "sd": 0.0353
+      },
+      "icu_auprc": {
+        "mean": 0.1494,
+        "sd": 0.0259
+      },
+      "icu_brier": {
+        "mean": 0.0583,
+        "sd": 0.0029
+      },
+      "loss": {
+        "mean": 0.5387,
+        "sd": 0.0217
+      }
+    },
+    "local_61": {
+      "n_seeds": 3,
+      "mort_auroc": {
+        "mean": 0.5833,
+        "sd": 0.0252
+      },
+      "mort_auprc": {
+        "mean": 0.148,
+        "sd": 0.0097
+      },
+      "mort_brier": {
+        "mean": 0.0996,
+        "sd": 0.0053
+      },
+      "icu_auroc": {
+        "mean": 0.543,
+        "sd": 0.0656
+      },
+      "icu_auprc": {
+        "mean": 0.0689,
+        "sd": 0.0159
+      },
+      "icu_brier": {
+        "mean": 0.0551,
+        "sd": 0.0005
+      },
+      "loss": {
+        "mean": 0.5745,
+        "sd": 0.018
+      }
+    }
+  },
+  "runs": {
+    "fedavg_gnn": {
+      "seed42": {
+        "loss": 0.4358,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.8131,
+        "mort_auprc": 0.3964,
+        "mort_f1": 0.2724,
+        "mort_precision": 0.6492,
+        "mort_recall": 0.1724,
+        "mort_specificity": 0.9901,
+        "mort_brier": 0.074,
+        "icu_auroc": 0.8544,
+        "icu_auprc": 0.34,
+        "icu_f1": 0.0961,
+        "icu_precision": 0.6429,
+        "icu_recall": 0.0519,
+        "icu_specificity": 0.9982,
+        "icu_brier": 0.0461,
+        "training": {
+          "selected_round": 43,
+          "rounds": 50,
+          "optimizer_steps": 6945,
+          "examples_trained": 216107,
+          "unique_patients_trained": 79458,
+          "hospitals_sampled": 143,
+          "failed_clients": 0
+        }
+      },
+      "seed43": {
+        "loss": 0.4555,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.8169,
+        "mort_auprc": 0.3944,
+        "mort_f1": 0.335,
+        "mort_precision": 0.5669,
+        "mort_recall": 0.2377,
+        "mort_specificity": 0.9807,
+        "mort_brier": 0.0774,
+        "icu_auroc": 0.8474,
+        "icu_auprc": 0.3279,
+        "icu_f1": 0.1476,
+        "icu_precision": 0.6259,
+        "icu_recall": 0.0837,
+        "icu_specificity": 0.9969,
+        "icu_brier": 0.047,
+        "training": {
+          "selected_round": 32,
+          "rounds": 50,
+          "optimizer_steps": 7257,
+          "examples_trained": 226303,
+          "unique_patients_trained": 81545,
+          "hospitals_sampled": 142,
+          "failed_clients": 0
+        }
+      },
+      "seed44": {
+        "loss": 0.4338,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.8273,
+        "mort_auprc": 0.4101,
+        "mort_f1": 0.2597,
+        "mort_precision": 0.6748,
+        "mort_recall": 0.1608,
+        "mort_specificity": 0.9918,
+        "mort_brier": 0.0726,
+        "icu_auroc": 0.8579,
+        "icu_auprc": 0.3417,
+        "icu_f1": 0.1842,
+        "icu_precision": 0.6043,
+        "icu_recall": 0.1087,
+        "icu_specificity": 0.9956,
+        "icu_brier": 0.0452,
+        "training": {
+          "selected_round": 32,
+          "rounds": 50,
+          "optimizer_steps": 7252,
+          "examples_trained": 226276,
+          "unique_patients_trained": 76559,
+          "hospitals_sampled": 141,
+          "failed_clients": 0
+        }
+      }
+    },
+    "fedavg_nognn": {
+      "seed42": {
+        "loss": 0.4622,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.7796,
+        "mort_auprc": 0.3373,
+        "mort_f1": 0.3298,
+        "mort_precision": 0.4745,
+        "mort_recall": 0.2527,
+        "mort_specificity": 0.9703,
+        "mort_brier": 0.0812,
+        "icu_auroc": 0.8254,
+        "icu_auprc": 0.3096,
+        "icu_f1": 0.3065,
+        "icu_precision": 0.4805,
+        "icu_recall": 0.225,
+        "icu_specificity": 0.9851,
+        "icu_brier": 0.0485,
+        "training": {
+          "selected_round": 44,
+          "rounds": 50,
+          "optimizer_steps": 6945,
+          "examples_trained": 216107,
+          "unique_patients_trained": 79436,
+          "hospitals_sampled": 143,
+          "failed_clients": 0
+        }
+      },
+      "seed43": {
+        "loss": 0.4667,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.814,
+        "mort_auprc": 0.3895,
+        "mort_f1": 0.2689,
+        "mort_precision": 0.5976,
+        "mort_recall": 0.1735,
+        "mort_specificity": 0.9876,
+        "mort_brier": 0.078,
+        "icu_auroc": 0.8463,
+        "icu_auprc": 0.3269,
+        "icu_f1": 0.2227,
+        "icu_precision": 0.5387,
+        "icu_recall": 0.1404,
+        "icu_specificity": 0.9926,
+        "icu_brier": 0.0486,
+        "training": {
+          "selected_round": 29,
+          "rounds": 50,
+          "optimizer_steps": 7257,
+          "examples_trained": 226303,
+          "unique_patients_trained": 81495,
+          "hospitals_sampled": 142,
+          "failed_clients": 0
+        }
+      },
+      "seed44": {
+        "loss": 0.4304,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.8259,
+        "mort_auprc": 0.4113,
+        "mort_f1": 0.3747,
+        "mort_precision": 0.5504,
+        "mort_recall": 0.284,
+        "mort_specificity": 0.9754,
+        "mort_brier": 0.0743,
+        "icu_auroc": 0.8545,
+        "icu_auprc": 0.345,
+        "icu_f1": 0.2837,
+        "icu_precision": 0.5332,
+        "icu_recall": 0.1933,
+        "icu_specificity": 0.9896,
+        "icu_brier": 0.0454,
+        "training": {
+          "selected_round": 44,
+          "rounds": 50,
+          "optimizer_steps": 7252,
+          "examples_trained": 226276,
+          "unique_patients_trained": 76547,
+          "hospitals_sampled": 141,
+          "failed_clients": 0
+        }
+      }
+    },
+    "local_183": {
+      "seed42": {
+        "loss": 0.5767,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.7895,
+        "mort_auprc": 0.3441,
+        "mort_f1": 0.365,
+        "mort_precision": 0.3498,
+        "mort_recall": 0.3817,
+        "mort_specificity": 0.9247,
+        "mort_brier": 0.0995,
+        "icu_auroc": 0.8192,
+        "icu_auprc": 0.2675,
+        "icu_f1": 0.1783,
+        "icu_precision": 0.4444,
+        "icu_recall": 0.1115,
+        "icu_specificity": 0.9915,
+        "icu_brier": 0.0613,
+        "training": {
+          "selected_round": 4,
+          "rounds": 50,
+          "optimizer_steps": 1500,
+          "examples_trained": 48000,
+          "unique_patients_trained": 1562,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      },
+      "seed43": {
+        "loss": 0.5425,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.7559,
+        "mort_auprc": 0.2891,
+        "mort_f1": 0.3298,
+        "mort_precision": 0.3152,
+        "mort_recall": 0.3459,
+        "mort_specificity": 0.9202,
+        "mort_brier": 0.0997,
+        "icu_auroc": 0.7807,
+        "icu_auprc": 0.2268,
+        "icu_f1": 0.2321,
+        "icu_precision": 0.3304,
+        "icu_recall": 0.1788,
+        "icu_specificity": 0.9778,
+        "icu_brier": 0.0577,
+        "training": {
+          "selected_round": 11,
+          "rounds": 50,
+          "optimizer_steps": 1500,
+          "examples_trained": 48000,
+          "unique_patients_trained": 1562,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      },
+      "seed44": {
+        "loss": 0.5233,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.7608,
+        "mort_auprc": 0.285,
+        "mort_f1": 0.321,
+        "mort_precision": 0.3315,
+        "mort_recall": 0.3112,
+        "mort_specificity": 0.9334,
+        "mort_brier": 0.0938,
+        "icu_auroc": 0.768,
+        "icu_auprc": 0.1773,
+        "icu_f1": 0.0295,
+        "icu_precision": 0.3556,
+        "icu_recall": 0.0154,
+        "icu_specificity": 0.9983,
+        "icu_brier": 0.0559,
+        "training": {
+          "selected_round": 8,
+          "rounds": 50,
+          "optimizer_steps": 1500,
+          "examples_trained": 48000,
+          "unique_patients_trained": 1562,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      }
+    },
+    "local_396": {
+      "seed42": {
+        "loss": 0.5607,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.6223,
+        "mort_auprc": 0.1808,
+        "mort_f1": 0.1696,
+        "mort_precision": 0.2807,
+        "mort_recall": 0.1215,
+        "mort_specificity": 0.967,
+        "mort_brier": 0.0926,
+        "icu_auroc": 0.6484,
+        "icu_auprc": 0.1201,
+        "icu_f1": 0.1249,
+        "icu_precision": 0.1975,
+        "icu_recall": 0.0913,
+        "icu_specificity": 0.9773,
+        "icu_brier": 0.0611,
+        "training": {
+          "selected_round": 15,
+          "rounds": 50,
+          "optimizer_steps": 750,
+          "examples_trained": 22900,
+          "unique_patients_trained": 458,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      },
+      "seed43": {
+        "loss": 0.5379,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.6645,
+        "mort_auprc": 0.216,
+        "mort_f1": 0.1948,
+        "mort_precision": 0.3593,
+        "mort_recall": 0.1336,
+        "mort_specificity": 0.9747,
+        "mort_brier": 0.088,
+        "icu_auroc": 0.7181,
+        "icu_auprc": 0.1694,
+        "icu_f1": 0.1837,
+        "icu_precision": 0.269,
+        "icu_recall": 0.1394,
+        "icu_specificity": 0.9768,
+        "icu_brier": 0.0585,
+        "training": {
+          "selected_round": 11,
+          "rounds": 50,
+          "optimizer_steps": 750,
+          "examples_trained": 22900,
+          "unique_patients_trained": 458,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      },
+      "seed44": {
+        "loss": 0.5174,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.693,
+        "mort_auprc": 0.2264,
+        "mort_f1": 0.1716,
+        "mort_precision": 0.3704,
+        "mort_recall": 0.1116,
+        "mort_specificity": 0.9799,
+        "mort_brier": 0.0842,
+        "icu_auroc": 0.6734,
+        "icu_auprc": 0.1586,
+        "icu_f1": 0.1471,
+        "icu_precision": 0.3033,
+        "icu_recall": 0.0971,
+        "icu_specificity": 0.9863,
+        "icu_brier": 0.0553,
+        "training": {
+          "selected_round": 10,
+          "rounds": 50,
+          "optimizer_steps": 750,
+          "examples_trained": 22900,
+          "unique_patients_trained": 458,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      }
+    },
+    "local_61": {
+      "seed42": {
+        "loss": 0.5561,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.5661,
+        "mort_auprc": 0.1368,
+        "mort_f1": 0.0849,
+        "mort_precision": 0.2425,
+        "mort_recall": 0.0515,
+        "mort_specificity": 0.9829,
+        "mort_brier": 0.0936,
+        "icu_auroc": 0.5971,
+        "icu_auprc": 0.0844,
+        "icu_f1": 0.0,
+        "icu_precision": 0.0,
+        "icu_recall": 0.0,
+        "icu_specificity": 1.0,
+        "icu_brier": 0.0546,
+        "training": {
+          "selected_round": 38,
+          "rounds": 50,
+          "optimizer_steps": 150,
+          "examples_trained": 4350,
+          "unique_patients_trained": 87,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      },
+      "seed43": {
+        "loss": 0.5752,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.6122,
+        "mort_auprc": 0.1538,
+        "mort_f1": 0.1675,
+        "mort_precision": 0.2262,
+        "mort_recall": 0.133,
+        "mort_specificity": 0.9517,
+        "mort_brier": 0.1018,
+        "icu_auroc": 0.5618,
+        "icu_auprc": 0.0696,
+        "icu_f1": 0.0,
+        "icu_precision": 0.0,
+        "icu_recall": 0.0,
+        "icu_specificity": 1.0,
+        "icu_brier": 0.0552,
+        "training": {
+          "selected_round": 46,
+          "rounds": 50,
+          "optimizer_steps": 150,
+          "examples_trained": 4350,
+          "unique_patients_trained": 87,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      },
+      "seed44": {
+        "loss": 0.5921,
+        "n_hospitals": 31,
+        "n_patients": 18014,
+        "mort_prevalence": 0.096,
+        "icu_prevalence": 0.0577,
+        "mort_auroc": 0.5717,
+        "mort_auprc": 0.1533,
+        "mort_f1": 0.1622,
+        "mort_precision": 0.2313,
+        "mort_recall": 0.1249,
+        "mort_specificity": 0.9559,
+        "mort_brier": 0.1035,
+        "icu_auroc": 0.4701,
+        "icu_auprc": 0.0526,
+        "icu_f1": 0.0,
+        "icu_precision": 0.0,
+        "icu_recall": 0.0,
+        "icu_specificity": 1.0,
+        "icu_brier": 0.0555,
+        "training": {
+          "selected_round": 44,
+          "rounds": 50,
+          "optimizer_steps": 150,
+          "examples_trained": 4350,
+          "unique_patients_trained": 87,
+          "hospitals_sampled": 1,
+          "failed_clients": 0
+        }
+      }
+    }
+  }
+}

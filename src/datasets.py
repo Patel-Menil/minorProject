@@ -33,6 +33,13 @@ TIMESERIES_TEXT_COLS = [
 ]
 TIMESERIES_ID_COL = "patientunitstayid"
 TIMESERIES_TIME_COL = "hour_bin"
+# hour_bin counts 4-hour blocks since ICU admission (checked: last bin ~ ICU stay hours / 4)
+HOUR_BIN_HOURS = 4
+
+# Early-prediction setup: inputs come from the first OBS_HOURS of the ICU stay,
+# and only patients still in the ICU at OBS_HOURS are predicted, so the input
+# window never contains the outcome itself.
+OBS_HOURS = 24
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -57,11 +64,14 @@ class EICUTabularDataset(Dataset):
         hospital_dir: str | pathlib.Path,
         fit_scaler: bool = True,
         canonical_features: Optional[list[str] | str | pathlib.Path] = None,
+        min_stay_hours: float = 0,
     ) -> None:
         super().__init__()
         hospital_dir = pathlib.Path(hospital_dir)
         parquet_path = hospital_dir / "tabular" / "tabular_features.parquet"
         df = pd.read_parquet(parquet_path)
+        # Keep only patients still in the ICU after min_stay_hours (offset is in minutes)
+        df = df[df["unitdischargeoffset"] >= min_stay_hours * 60].reset_index(drop=True)
 
         # Store patient IDs for later reference (graph construction, etc.)
         self.patient_ids = df[TABULAR_ID_COL].values.copy()
@@ -147,7 +157,7 @@ class EICUTimeSeriesDataset(Dataset):
     """
     Loads the `timeseries_features.parquet` for one hospital.
 
-    Each patient has a variable number of hourly time-steps.
+    Each patient has a variable number of 4-hour time-steps (hour_bin).
     Sequences are padded/truncated to `max_seq_len` and original lengths
     are returned so that downstream code can use `pack_padded_sequence`.
 
@@ -158,7 +168,9 @@ class EICUTimeSeriesDataset(Dataset):
     stats_path : str or pathlib.Path, optional
         Path to `processed/timeseries_stats.json` (global mean/std for labs).
     max_seq_len : int
-        Fixed sequence length to pad/truncate to (default: 48 hours).
+        Fixed sequence length (in 4-hour bins) to pad/truncate to.
+    obs_hours : float, optional
+        If given, only time-steps from the first `obs_hours` of the ICU stay are kept.
     tabular_dataset : EICUTabularDataset, optional
         If provided, aligns patient ordering and fetches targets from the
         tabular dataset (so that both datasets share the same patient set).
@@ -175,11 +187,14 @@ class EICUTimeSeriesDataset(Dataset):
         max_seq_len: int = 48,
         tabular_dataset: Optional[EICUTabularDataset] = None,
         canonical_features: Optional[list[str] | str | pathlib.Path] = None,
+        obs_hours: Optional[float] = None,
     ) -> None:
         super().__init__()
         hospital_dir = pathlib.Path(hospital_dir)
         parquet_path = hospital_dir / "timeseries" / "timeseries_features.parquet"
         df = pd.read_parquet(parquet_path)
+        if obs_hours is not None:
+            df = df[df[TIMESERIES_TIME_COL] < obs_hours / HOUR_BIN_HOURS]
 
         # ── Load global normalisation stats if provided ──────────────────
         raw_stats = {}
@@ -314,6 +329,91 @@ class EICUTimeSeriesDataset(Dataset):
             targets,
             pid,
         )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+#  Multimodal Dataset (tabular + time-series joined by patient ID)
+# ═══════════════════════════════════════════════════════════════════════════
+class EICUMultimodalDataset(Dataset):
+    """
+    Pairs the tabular row and the time-series sequence of the SAME patient.
+
+    Use this with a single DataLoader. Zipping two separately shuffled
+    loaders mixes up patients (features of one, label of another).
+
+    Patients missing from either modality are dropped. Targets always come
+    from the tabular row of that same patient.
+    """
+
+    def __init__(
+        self,
+        tabular_dataset: EICUTabularDataset,
+        timeseries_dataset: EICUTimeSeriesDataset,
+    ) -> None:
+        super().__init__()
+        tab_ids = [int(p) for p in tabular_dataset.patient_ids]
+        ts_ids = [int(p) for p in timeseries_dataset.patient_ids]
+        if len(set(tab_ids)) != len(tab_ids):
+            raise ValueError("Duplicate patient IDs in tabular data")
+        if len(set(ts_ids)) != len(ts_ids):
+            raise ValueError("Duplicate patient IDs in time-series data")
+
+        ts_index = {pid: i for i, pid in enumerate(ts_ids)}
+        # (tabular row, time-series row) for every patient present in both
+        self.pairs = [(i, ts_index[pid]) for i, pid in enumerate(tab_ids) if pid in ts_index]
+        self.patient_ids = np.array([tab_ids[i] for i, _ in self.pairs], dtype=np.int64)
+        self.num_dropped = len(tab_ids) - len(self.pairs)
+
+        self.tabular = tabular_dataset
+        self.timeseries = timeseries_dataset
+
+    @property
+    def tabular_dim(self) -> int:
+        return self.tabular.input_dim
+
+    @property
+    def timeseries_dim(self) -> int:
+        return self.timeseries.input_dim
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def __getitem__(self, idx: int):
+        """
+        Returns
+        -------
+        tab_x      : FloatTensor (tabular_dim,)
+        ts_x       : FloatTensor (max_seq_len, timeseries_dim)
+        length     : int
+        targets    : FloatTensor (4,)
+        patient_id : int
+        """
+        tab_i, ts_i = self.pairs[idx]
+        tab_x, targets, pid = self.tabular[tab_i]
+        ts_x, length, _, ts_pid = self.timeseries[ts_i]
+        assert pid == ts_pid, f"Modality mismatch: tabular {pid} vs time-series {ts_pid}"
+        return tab_x, ts_x, length, targets, pid
+
+
+def load_hospital_dataset(
+    hospital_dir: str | pathlib.Path,
+    stats_path: Optional[str | pathlib.Path] = None,
+    obs_hours: float = OBS_HOURS,
+) -> EICUMultimodalDataset:
+    """
+    Loads one hospital's tabular + time-series data, paired by patient ID,
+    for early prediction: patients still in the ICU at `obs_hours`, with
+    time-series from the first `obs_hours` only (6 bins of 4 hours for 24 h).
+    """
+    tab_ds = EICUTabularDataset(hospital_dir, fit_scaler=True, min_stay_hours=obs_hours)
+    ts_ds = EICUTimeSeriesDataset(
+        hospital_dir,
+        stats_path=stats_path,
+        max_seq_len=int(obs_hours // HOUR_BIN_HOURS),
+        tabular_dataset=tab_ds,
+        obs_hours=obs_hours,
+    )
+    return EICUMultimodalDataset(tab_ds, ts_ds)
 
 
 # ═══════════════════════════════════════════════════════════════════════════

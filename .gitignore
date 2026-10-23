@@ -43,3 +43,10 @@ node_modules/
 
 # Playground output from real eICU data: per-patient results, keep local only
 frontend-playground/public/graph_data.json
+
+
+# Experiment checkpoints (large binaries; regenerate with scripts/run_experiments.py)
+results/**/*.pth
+# Superseded 8-day-window partial runs (kept locally only)
+results/superseded_8day_window/
+

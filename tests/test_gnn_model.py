@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader
 # Add project root to sys.path
 sys.path.append(str(pathlib.Path(__file__).resolve().parent.parent))
 
-from src.datasets import EICUTabularDataset, EICUTimeSeriesDataset, timeseries_collate_fn
+from src.datasets import load_hospital_dataset
 from src.gnn import PatientGNN
 from src.models import FederatedPatientModel, MultiTaskLoss, MultiTaskPredictionHeads
 from src.graph_builder import build_knn_graph
@@ -70,21 +70,10 @@ def test_end_to_end_model_and_loss():
     print("\n--- Test 2: End-to-End FederatedPatientModel on Hospital 102 ---")
 
     # 1. Load Data
-    tab_ds = EICUTabularDataset(HOSPITAL_DIR, fit_scaler=True)
-    ts_ds = EICUTimeSeriesDataset(
-        HOSPITAL_DIR, STATS_PATH, max_seq_len=48, tabular_dataset=tab_ds
-    )
+    ds = load_hospital_dataset(HOSPITAL_DIR, STATS_PATH)
 
     batch_size = 16
-    tab_loader = DataLoader(tab_ds, batch_size=batch_size, shuffle=False)
-    ts_loader = DataLoader(
-        ts_ds, batch_size=batch_size, shuffle=False, collate_fn=timeseries_collate_fn
-    )
-
-    tab_feats, targets_tab, _ = next(iter(tab_loader))
-    seqs, lens, targets_ts, pids = next(iter(ts_loader))
-
-    targets = targets_ts if targets_ts is not None else targets_tab
+    tab_feats, seqs, lens, targets, pids = next(iter(DataLoader(ds, batch_size=batch_size, shuffle=False)))
 
     print(f"  Loaded batch: {len(pids)} patients")
     print(f"  Tabular features shape: {tab_feats.shape}")
@@ -93,8 +82,8 @@ def test_end_to_end_model_and_loss():
 
     # 2. Instantiate Model
     model = FederatedPatientModel(
-        tabular_input_dim=tab_ds.input_dim,
-        timeseries_input_dim=ts_ds.input_dim,
+        tabular_input_dim=ds.tabular_dim,
+        timeseries_input_dim=ds.timeseries_dim,
         tabular_emb_dim=64,
         timeseries_emb_dim=64,
         fused_dim=128,
@@ -115,7 +104,7 @@ def test_end_to_end_model_and_loss():
     )
 
     mortality_logits = outputs["mortality_logits"]
-    sepsis_logits = outputs["sepsis_logits"]
+    icu_logits = outputs["icu_logits"]
     fused_emb = outputs["fused_emb"]
     graph_emb = outputs["graph_emb"]
     edge_index = outputs["edge_index"]
@@ -124,10 +113,10 @@ def test_end_to_end_model_and_loss():
     print(f"  Graph Edges       : {edge_index.shape[1]}")
     print(f"  Graph Embeddings  : {graph_emb.shape}")
     print(f"  Mortality Logits  : {mortality_logits.shape}")
-    print(f"  Sepsis Logits     : {sepsis_logits.shape}")
+    print(f"  ICU Logits        : {icu_logits.shape}")
 
     assert mortality_logits.shape == (batch_size, 1)
-    assert sepsis_logits.shape == (batch_size, 1)
+    assert icu_logits.shape == (batch_size, 1)
     assert fused_emb.shape == (batch_size, 128)
     assert graph_emb.shape == (batch_size, 64)
     print("  [OK] Forward pass shapes verified")
@@ -135,15 +124,15 @@ def test_end_to_end_model_and_loss():
     # 4. Multi-Task Loss and Backward Pass
     criterion = MultiTaskLoss(
         w_mortality=1.0,
-        w_sepsis=1.0,
+        w_icu=1.0,
         pos_weight_mortality=2.0,
-        pos_weight_sepsis=2.0,
+        pos_weight_icu=2.0,
     )
 
-    total_loss, loss_mort, loss_seps = criterion(mortality_logits, sepsis_logits, targets)
+    total_loss, loss_mort, loss_icu = criterion(mortality_logits, icu_logits, targets)
     print(f"  Total Multi-Task Loss : {total_loss.item():.4f}")
     print(f"    - Mortality Loss    : {loss_mort.item():.4f}")
-    print(f"    - Sepsis/ICU Loss   : {loss_seps.item():.4f}")
+    print(f"    - ICU Mortality Loss: {loss_icu.item():.4f}")
 
     total_loss.backward()
 

@@ -1,0 +1,49 @@
+fedavg_gnn seed42: ok in 9.8 min
+fedavg_nognn seed42: ok in 8.3 min
+local_61 seed42: ok in 2.7 min
+local_396 seed42: ok in 3.5 min
+local_183 seed42: ok in 4.9 min
+fedavg_gnn seed43: ok in 11.7 min
+fedavg_nognn seed43: ok in 10.6 min
+local_61 seed43: ok in 3.3 min
+local_396 seed43: ok in 3.7 min
+local_183 seed43: ok in 4.7 min
+fedavg_gnn seed44: ok in 11.0 min
+fedavg_nognn seed44: ok in 9.6 min
+local_61 seed44: ok in 2.8 min
+local_396 seed44: ok in 3.4 min
+local_183 seed44: ok in 4.3 min
+C:\Users\menil\AppData\Local\Python\pythoncore-3.14-64\Lib\site-packages\torch\jit\_script.py:1485: FutureWarning: `torch.jit.script` is not supported in Python 3.14+ and may break. Please switch to `torch.compile` or `torch.export`.
+  warnings.warn(
+===========================================================================
+ 📊 Benchmark on held-out test hospitals - eICU Multimodal Graph Learning
+===========================================================================
+Test hospitals: 31 (18014 patients) | Runs: 15
+  fedavg_gnn         seed42  round 43 | Mort AUROC 0.8131 | ICU AUROC 0.8544
+  fedavg_gnn         seed43  round 32 | Mort AUROC 0.8169 | ICU AUROC 0.8474
+  fedavg_gnn         seed44  round 32 | Mort AUROC 0.8273 | ICU AUROC 0.8579
+  fedavg_nognn       seed42  round 44 | Mort AUROC 0.7796 | ICU AUROC 0.8254
+  fedavg_nognn       seed43  round 29 | Mort AUROC 0.8140 | ICU AUROC 0.8463
+  fedavg_nognn       seed44  round 44 | Mort AUROC 0.8259 | ICU AUROC 0.8545
+  local_183          seed42  round  4 | Mort AUROC 0.7895 | ICU AUROC 0.8192
+  local_183          seed43  round 11 | Mort AUROC 0.7559 | ICU AUROC 0.7807
+  local_183          seed44  round  8 | Mort AUROC 0.7608 | ICU AUROC 0.7680
+  local_396          seed42  round 15 | Mort AUROC 0.6223 | ICU AUROC 0.6484
+  local_396          seed43  round 11 | Mort AUROC 0.6645 | ICU AUROC 0.7181
+  local_396          seed44  round 10 | Mort AUROC 0.6930 | ICU AUROC 0.6734
+  local_61           seed42  round 38 | Mort AUROC 0.5661 | ICU AUROC 0.5971
+  local_61           seed43  round 46 | Mort AUROC 0.6122 | ICU AUROC 0.5618
+  local_61           seed44  round 44 | Mort AUROC 0.5717 | ICU AUROC 0.4701
+
+===========================================================================
+ 🏆 TEST-HOSPITAL RESULTS (mean ± SD over seeds)
+===========================================================================
+Model                | Seeds | Mort AUROC       | Mort AUPRC       | ICU AUROC        | ICU AUPRC       
+fedavg_gnn           | 3     | 0.8191 ± 0.0074  | 0.4003 ± 0.0085  | 0.8532 ± 0.0053  | 0.3365 ± 0.0075 
+fedavg_nognn         | 3     | 0.8065 ± 0.0240  | 0.3794 ± 0.0380  | 0.8421 ± 0.0150  | 0.3272 ± 0.0177 
+local_183            | 3     | 0.7687 ± 0.0182  | 0.3061 ± 0.0330  | 0.7893 ± 0.0267  | 0.2239 ± 0.0452 
+local_396            | 3     | 0.6599 ± 0.0356  | 0.2077 ± 0.0239  | 0.6800 ± 0.0353  | 0.1494 ± 0.0259 
+local_61             | 3     | 0.5833 ± 0.0252  | 0.1480 ± 0.0097  | 0.5430 ± 0.0656  | 0.0689 ± 0.0159 
+===========================================================================
+Results saved to: C:\minorProject\results\corrected\benchmark_results.json
+

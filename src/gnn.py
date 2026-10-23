@@ -138,24 +138,20 @@ class PatientGNN(nn.Module):
         """
         num_nodes = x.size(0)
 
-        # Handle edge case: empty graph / isolated batch without edges
-        has_edges = edge_index is not None and edge_index.numel() > 0 and edge_index.size(1) > 0
-
         h = x
         for i in range(self.num_layers):
             h_prev = h
 
-            if has_edges:
-                if self.model_type == "gcn" and edge_weight is not None:
-                    h = self.convs[i](h, edge_index, edge_weight=edge_weight)
-                else:
-                    h = self.convs[i](h, edge_index)
+            # PyG layers handle an empty edge_index themselves (each node then uses
+            # only its own features), so no special case is needed.
+            # Only GCN uses edge weights; SAGE (mean) and GAT (learned attention) ignore them.
+            if self.model_type == "gcn" and edge_weight is not None:
+                h = self.convs[i](h, edge_index, edge_weight=edge_weight)
             else:
-                # Fallback to linear transformation if no edges exist in batch
-                h = self.convs[i].lin_l(h) if hasattr(self.convs[i], "lin_l") else h
+                h = self.convs[i](h, edge_index)
 
-            # Normalization (only if batch size > 1 for BatchNorm)
-            if num_nodes > 1:
+            # BatchNorm needs >1 node only while training; in eval it uses running stats
+            if num_nodes > 1 or not self.training:
                 h = self.norms[i](h)
 
             # Non-linear activation
