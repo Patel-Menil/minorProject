@@ -40,3 +40,6 @@ node_modules/
 .vscode/
 *.swp
 
+
+# Playground output from real eICU data: per-patient results, keep local only
+frontend-playground/public/graph_data.json
