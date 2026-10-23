@@ -12,6 +12,7 @@ report_assets/corrected/ so the original report figures are kept.
 import json
 import os
 import pathlib
+import sys
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -20,6 +21,8 @@ import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = pathlib.Path(__file__).resolve().parent.parent
+sys.path.append(str(PROJECT_ROOT))
+from src.splits import has_both_modalities
 ASSETS_DIR = PROJECT_ROOT / "report_assets" / "corrected"
 ASSETS_DIR.mkdir(parents=True, exist_ok=True)
 RESULTS_DIR = PROJECT_ROOT / "results" / "corrected"
@@ -166,8 +169,9 @@ def generate_figure_2():
 # Figure 3: Hospital Patient Count Distribution
 # ─────────────────────────────────────────────────────────────────────────────
 def generate_figure_3():
+    # Same 207 hospitals as the experiments (both modalities present)
     h_dirs = sorted([d for d in (PROJECT_ROOT / "processed" / "hospitals").iterdir()
-                     if d.is_dir() and (d / "tabular" / "tabular_features.parquet").exists()])
+                     if d.is_dir() and has_both_modalities(d)])
     counts = []
     for d in h_dirs:
         df = pd.read_parquet(d / "tabular" / "tabular_features.parquet")

@@ -25,7 +25,7 @@ import pathlib
 import statistics
 import docx
 from docx.shared import Inches, Pt, RGBColor, Cm, Emu
-from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.enum.text import WD_ALIGN_PARAGRAPH, WD_BREAK
 from docx.enum.table import WD_TABLE_ALIGNMENT, WD_ALIGN_VERTICAL
 from docx.enum.section import WD_ORIENT
 from docx.oxml import OxmlElement, parse_xml
@@ -127,6 +127,16 @@ def add_para(doc, text="", space_after=6, line_spacing=1.15,
     return p
 
 
+def page_break(doc):
+    """Page break on the last paragraph (not a new one), so a full page doesn't leave a blank page."""
+    body = doc.element.body
+    last = body[-2] if body[-1].tag == qn('w:sectPr') else body[-1]
+    if last.tag == qn('w:p'):
+        doc.paragraphs[-1].add_run().add_break(WD_BREAK.PAGE)
+    else:  # last element is a table: a separate break paragraph is needed
+        doc.add_page_break()
+
+
 def add_empty_para(doc, space_after=6):
     """Add an empty paragraph for spacing."""
     p = doc.add_paragraph()
@@ -226,6 +236,11 @@ def style_table_professional(table, has_header=True):
     set_table_borders(table, color="333333", size=4)
 
     for i, row in enumerate(table.rows):
+        # Keep each row on one page; repeat the header row when the table spans pages
+        tr_pr = row._tr.get_or_add_trPr()
+        tr_pr.append(OxmlElement('w:cantSplit'))
+        if has_header and i == 0:
+            tr_pr.append(OxmlElement('w:tblHeader'))
         for cell in row.cells:
             cell.vertical_alignment = WD_ALIGN_VERTICAL.CENTER
             set_cell_margins(cell, top=60, bottom=60, left=100, right=100)
@@ -335,6 +350,8 @@ def add_page_number_footer(section):
 
 def build_report():
     doc = docx.Document()
+    # Don't stretch justified lines that end in a manual line break (bullet lists, equations)
+    doc.settings.element.find(qn('w:compat')).insert(0, OxmlElement('w:doNotExpandShiftReturn'))
 
     # ── Default style configuration ──────────────────────────────────────────
     style = doc.styles['Normal']
@@ -357,9 +374,9 @@ def build_report():
     # 1. TITLE PAGE
     # ═════════════════════════════════════════════════════════════════════════
     
-    # Top spacing
-    add_empty_para(doc, space_after=36)
-    
+    # Top spacing (kept small so the title page fits on one page)
+    add_empty_para(doc, space_after=6)
+
     add_para(doc, "INDIAN INSTITUTE OF INFORMATION TECHNOLOGY",
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=2)
     add_para(doc, "BHOPAL (M.P.)",
@@ -368,9 +385,9 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=13, space_after=4)
     
     add_horizontal_line(doc)
-    
-    add_empty_para(doc, space_after=24)
-    
+
+    add_empty_para(doc, space_after=12)
+
     add_para(doc, "B.Tech Major Project Report",
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=14, space_after=4)
     add_para(doc, "(Phase – II)",
@@ -443,7 +460,7 @@ def build_report():
     add_para(doc, "October 2026",
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=12, space_after=6)
     
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 2. CERTIFICATE
@@ -504,7 +521,7 @@ def build_report():
         name_run.font.size = Pt(11)
         name_run.bold = True
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 3. DECLARATION
@@ -554,7 +571,7 @@ def build_report():
         name_run.font.size = Pt(11)
         name_run.bold = True
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 4. ACKNOWLEDGEMENT
@@ -575,7 +592,7 @@ def build_report():
         "We are profoundly grateful to our Project Supervisor for invaluable guidance, patient mentoring, "
         "perceptive critique, and continuous encouragement throughout the lifecycle of this research. Their "
         "deep domain expertise in artificial intelligence, graph representation learning, and federated "
-        "systems provided us with the direction required to formulate a clinically sound, privacy-preserving "
+        "systems provided us with the direction required to design and evaluate a federated "
         "predictive framework.",
 
         "We also convey our gratitude to the Head of the Department and Department Coordinator, Department "
@@ -597,7 +614,7 @@ def build_report():
     add_empty_para(doc, space_after=24)
     add_para(doc, "Dhruv Savaliya (21U02035)\nMenil Patel (21U02052)",
              align=WD_ALIGN_PARAGRAPH.RIGHT, bold=True, size=12)
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 5. ABSTRACT
@@ -644,7 +661,7 @@ def build_report():
         "0.400 ± 0.009) and an ICU mortality AUROC of 0.853 ± 0.005. It is consistently better than "
         "local-only training on a single hospital (AUROC 0.769, 0.660 and 0.583 for hospitals of 1,562, "
         "458 and 87 patients), and the gap grows as the single hospital gets smaller. Removing the graph "
-        "(No-GNN ablation) lowers the in-hospital mortality AUROC slightly to 0.807 ± 0.024, so the graph "
+        "(No-GNN ablation) lowers the in-hospital mortality AUROC slightly to 0.806 ± 0.024, so the graph "
         "gives a small but consistent gain on this task rather than a large one. These results show that a "
         "simple federated multimodal graph model can learn useful early mortality risk from decentralized "
         "ICU data; they come from a single-machine simulation and are not a clinical validation.",
@@ -670,7 +687,7 @@ def build_report():
     r_kw.font.size = Pt(12)
     r_kw.italic = True
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 6. TABLE OF CONTENTS
@@ -679,65 +696,65 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     toc_data = [
-        ("", "Certificate", "3"),
-        ("", "Declaration", "4"),
-        ("", "Acknowledgement", "5"),
-        ("", "Abstract", "6"),
-        ("", "Table of Contents", "8"),
-        ("", "List of Figures", "11"),
-        ("", "List of Tables", "11"),
-        ("1", "Introduction", "13"),
-        ("1.1", "Clinical Background & Motivation", "13"),
-        ("1.2", "The Privacy-Utility Conundrum in Healthcare", "13"),
-        ("1.3", "Challenges in Multimodal Critical Care Modeling", "14"),
-        ("1.4", "Proposed Federated Graph Learning Paradigm", "14"),
-        ("1.5", "Organization of the Report", "14"),
-        ("2", "Literature Review", "16"),
-        ("2.1", "Clinical Risk Stratification Systems", "16"),
-        ("2.2", "Deep Learning for Electronic Health Records", "16"),
-        ("2.3", "Multimodal Representation Learning in Medicine", "17"),
-        ("2.4", "Graph Neural Networks & Patient Similarity Networks", "17"),
-        ("2.5", "Federated Learning in Distributed Healthcare", "18"),
-        ("2.6", "Critical Analysis and Research Gaps", "19"),
-        ("3", "Problem Definition and Objectives", "20"),
-        ("3.1", "Formal Problem Formulation", "20"),
-        ("3.2", "Research Objectives", "20"),
-        ("3.3", "Technical Scope & Boundary Conditions", "21"),
-        ("4", "Proposed Methodology and Work Description", "22"),
-        ("4.1", "System Architectural Overview", "22"),
-        ("4.2", "Multimodal Data Ingestion & Canonical Alignment", "23"),
-        ("4.3", "Modality-Specific Encoders", "23"),
-        ("4.4", "Multimodal Non-Linear Fusion Layer", "24"),
-        ("4.5", "Intra-Hospital Patient Graph Construction", "24"),
-        ("4.6", "Graph Representation Learning (PatientGNN)", "25"),
-        ("4.7", "Multi-Task Clinical Prediction Heads", "25"),
-        ("4.8", "Joint Multi-Task Objective with Imbalance Weighting", "25"),
-        ("5", "Proposed Algorithms", "27"),
-        ("5.1", "Client-Side Local Multimodal Graph Training", "27"),
-        ("5.2", "Server-Side Federated Averaging Coordination", "27"),
-        ("6", "Flowchart, Block Diagram, and DFD", "29"),
-        ("6.1", "System Architectural Block Diagram", "29"),
-        ("6.2", "Data Flow Diagram (DFD)", "29"),
-        ("6.3", "Graph Construction Flowchart", "30"),
-        ("7", "Implementation Details & Technology Stack", "31"),
-        ("7.1", "Hardware & Software Environments", "31"),
-        ("7.2", "Dataset Specification (eICU Database)", "31"),
-        ("7.3", "Data Pipeline Implementation", "32"),
-        ("7.4", "Deep Learning & GNN Modules", "32"),
-        ("7.5", "Federated Training Engine", "33"),
-        ("8", "Result Discussion and Comparative Analysis", "35"),
-        ("8.1", "Experimental Setup & Evaluation Protocol", "35"),
-        ("8.2", "Clinical Evaluation Metrics", "35"),
-        ("8.3", "Federated Convergence Dynamics", "35"),
-        ("8.4", "Comparative Baseline Evaluation", "36"),
-        ("8.5", "Patient Graph Visualization", "38"),
-        ("9", "Conclusion and Future Scope", "40"),
-        ("9.1", "Summary of Contributions", "40"),
-        ("9.2", "Limitations of the Current Study", "40"),
-        ("9.3", "Future Research Directions", "41"),
-        ("", "References (IEEE Format)", "43"),
-        ("", "List of Publications", "45"),
-        ("", "Plagiarism & Authenticity Report", "46"),
+        ("", "Certificate", "2"),
+        ("", "Declaration", "3"),
+        ("", "Acknowledgement", "4"),
+        ("", "Abstract", "5"),
+        ("", "Table of Contents", "7"),
+        ("", "List of Figures", "10"),
+        ("", "List of Tables", "10"),
+        ("1", "Introduction", "12"),
+        ("1.1", "Clinical Background & Motivation", "12"),
+        ("1.2", "The Privacy-Utility Conundrum in Healthcare", "12"),
+        ("1.3", "Challenges in Multimodal Critical Care Modeling", "13"),
+        ("1.4", "Proposed Federated Graph Learning Paradigm", "13"),
+        ("1.5", "Organization of the Report", "13"),
+        ("2", "Literature Review", "15"),
+        ("2.1", "Clinical Risk Stratification Systems", "15"),
+        ("2.2", "Deep Learning for Electronic Health Records", "15"),
+        ("2.3", "Multimodal Representation Learning in Medicine", "16"),
+        ("2.4", "Graph Neural Networks & Patient Similarity Networks", "16"),
+        ("2.5", "Federated Learning in Distributed Healthcare", "17"),
+        ("2.6", "Critical Analysis and Research Gaps", "18"),
+        ("3", "Problem Definition and Objectives", "19"),
+        ("3.1", "Formal Problem Formulation", "19"),
+        ("3.2", "Research Objectives", "19"),
+        ("3.3", "Technical Scope & Boundary Conditions", "20"),
+        ("4", "Proposed Methodology and Work Description", "21"),
+        ("4.1", "System Architectural Overview", "21"),
+        ("4.2", "Multimodal Data Ingestion & Canonical Alignment", "22"),
+        ("4.3", "Modality-Specific Encoders", "22"),
+        ("4.4", "Multimodal Non-Linear Fusion Layer", "23"),
+        ("4.5", "Intra-Hospital Patient Graph Construction", "23"),
+        ("4.6", "Graph Representation Learning (PatientGNN)", "24"),
+        ("4.7", "Multi-Task Clinical Prediction Heads", "24"),
+        ("4.8", "Joint Multi-Task Objective with Imbalance Weighting", "24"),
+        ("5", "Proposed Algorithms", "26"),
+        ("5.1", "Client-Side Local Multimodal Graph Training", "26"),
+        ("5.2", "Server-Side Federated Averaging Coordination", "26"),
+        ("6", "Flowchart, Block Diagram, and DFD", "28"),
+        ("6.1", "System Architectural Block Diagram", "28"),
+        ("6.2", "Data Flow Diagram (DFD)", "28"),
+        ("6.3", "Graph Construction Flowchart", "29"),
+        ("7", "Implementation Details & Technology Stack", "30"),
+        ("7.1", "Hardware & Software Environments", "30"),
+        ("7.2", "Dataset Specification (eICU Database)", "30"),
+        ("7.3", "Data Pipeline Implementation", "31"),
+        ("7.4", "Deep Learning & GNN Modules", "31"),
+        ("7.5", "Federated Training Engine", "32"),
+        ("8", "Result Discussion and Comparative Analysis", "34"),
+        ("8.1", "Experimental Setup & Evaluation Protocol", "34"),
+        ("8.2", "Clinical Evaluation Metrics", "34"),
+        ("8.3", "Federated Convergence Dynamics", "34"),
+        ("8.4", "Comparative Baseline Evaluation", "35"),
+        ("8.5", "Patient Graph Visualization", "37"),
+        ("9", "Conclusion and Future Scope", "39"),
+        ("9.1", "Summary of Contributions", "39"),
+        ("9.2", "Limitations of the Current Study", "39"),
+        ("9.3", "Future Research Directions", "40"),
+        ("", "References (IEEE Format)", "41"),
+        ("", "List of Publications", "43"),
+        ("", "Plagiarism & Authenticity Report", "44"),
     ]
 
     t_toc = doc.add_table(rows=len(toc_data) + 1, cols=3)
@@ -795,7 +812,7 @@ def build_report():
         for cell in row.cells:
             set_cell_margins(cell, top=40, bottom=40, left=80, right=80)
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # 7. LIST OF FIGURES & LIST OF TABLES
@@ -804,12 +821,12 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     figures_list = [
-        ("Figure 1", "Federated Multimodal Graph Learning End-to-End System Architecture", "29"),
-        ("Figure 2", "Data Flow Diagram (Level 0 Context and Level 1 Functional Pipeline)", "30"),
-        ("Figure 3", "Hospital Patient Population Scale and Distribution across 207 eICU Sites", "32"),
-        ("Figure 4", "Validation Loss and Mortality AUROC per Round (FedAvg + GNN vs No-GNN, mean ± SD over 3 seeds)", "36"),
-        ("Figure 5", "Test-Hospital Performance: FedAvg + GNN vs No-GNN vs Local-Only", "38"),
-        ("Figure 6", "Patient Similarity Graph Built by the Trained Model on Test Hospital 120", "39"),
+        ("Figure 1", "Federated Multimodal Graph Learning End-to-End System Architecture", "28"),
+        ("Figure 2", "Data Flow Diagram (Level 0 Context and Level 1 Functional Pipeline)", "29"),
+        ("Figure 3", "Hospital Patient Population Scale and Distribution across 207 eICU Sites", "31"),
+        ("Figure 4", "Validation Loss and Mortality AUROC per Round (FedAvg + GNN vs No-GNN, mean ± SD over 3 seeds)", "35"),
+        ("Figure 5", "Test-Hospital Performance: FedAvg + GNN vs No-GNN vs Local-Only", "37"),
+        ("Figure 6", "Patient Similarity Graph Built by the Trained Model on Test Hospital 120", "38"),
     ]
 
     t_lof = doc.add_table(rows=len(figures_list) + 1, cols=3)
@@ -831,12 +848,12 @@ def build_report():
              align=WD_ALIGN_PARAGRAPH.CENTER, bold=True, size=16, space_after=18)
 
     tables_list = [
-        ("Table 1", "Multimodal Feature Modalities in Critical Care Medicine", "17"),
-        ("Table 2", "Comparison of Contemporary Machine Learning Healthcare Frameworks", "18"),
-        ("Table 3", "Canonical Feature Dimensions and Modality Specifications", "22"),
-        ("Table 4", "Hyperparameter Configuration for Federated Patient Graph Model", "33"),
-        ("Table 5", "Validation Convergence of the Proposed FedAvg + GNN Model (mean of 3 seeds)", "36"),
-        ("Table 6", "Test-Hospital Results (mean ± SD over 3 seeds)", "37"),
+        ("Table 1", "Multimodal Feature Modalities in Critical Care Medicine", "16"),
+        ("Table 2", "Comparison of Contemporary Machine Learning Healthcare Frameworks", "17"),
+        ("Table 3", "Canonical Feature Dimensions and Modality Specifications", "21"),
+        ("Table 4", "Hyperparameter Configuration for Federated Patient Graph Model", "32"),
+        ("Table 5", "Validation Convergence of the Proposed FedAvg + GNN Model (mean of 3 seeds)", "35"),
+        ("Table 6", "Test-Hospital Results (mean ± SD over 3 seeds)", "36"),
     ]
 
     t_lot = doc.add_table(rows=len(tables_list) + 1, cols=3)
@@ -852,7 +869,7 @@ def build_report():
         p_pg.add_run(pg)
     style_table_professional(t_lot)
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 1: INTRODUCTION
@@ -958,7 +975,7 @@ def build_report():
         "\u2022 Chapter 8 presents empirical results, convergence curves, and comparative benchmarks.\n"
         "\u2022 Chapter 9 concludes the study and outlines future research avenues."
     ))
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 2: LITERATURE REVIEW
@@ -1136,7 +1153,7 @@ def build_report():
         "EHR encoding, intra-hospital patient graph learning, positive-class weighted multi-task prediction "
         "and federated averaging, evaluated on eICU with a hospital-level train / validation / test split."
     ))
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 3: PROBLEM DEFINITION AND OBJECTIVES
@@ -1227,7 +1244,7 @@ def build_report():
         "\u2022 Evaluation Protocol: Hospitals are split into 145 training, 31 validation (checkpoint selection "
         "only) and 31 test hospitals (final evaluation only)."
     ))
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 4: PROPOSED METHODOLOGY AND WORK DESCRIPTION
@@ -1418,7 +1435,7 @@ def build_report():
         "Prediction Heads, PatientGNN, Multimodal Fusion, and both Modality Encoders via end-to-end "
         "gradient descent."
     ))
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 5: PROPOSED ALGORITHMS
@@ -1464,6 +1481,7 @@ def build_report():
     alg1_text = "\n".join(alg1_lines)
     p_alg1 = add_para(doc, alg1_text, align=WD_ALIGN_PARAGRAPH.LEFT, size=9.5, space_after=18)
     p_alg1.paragraph_format.line_spacing = 1.0
+    p_alg1.paragraph_format.keep_together = True  # do not split the algorithm across pages
 
     add_heading_2(doc, "5.2 Algorithm 2: Server-Side Federated Averaging Coordination")
     add_para(doc, (
@@ -1500,7 +1518,8 @@ def build_report():
     alg2_text = "\n".join(alg2_lines)
     p_alg2 = add_para(doc, alg2_text, align=WD_ALIGN_PARAGRAPH.LEFT, size=9.5, space_after=18)
     p_alg2.paragraph_format.line_spacing = 1.0
-    doc.add_page_break()
+    p_alg2.paragraph_format.keep_together = True  # do not split the algorithm across pages
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 6: FLOWCHART, BLOCK DIAGRAM, AND DFD
@@ -1555,7 +1574,7 @@ def build_report():
         "explicit self-loops are added. Figure 6 (Chapter 8) shows a graph built this way by the trained "
         "model on a test hospital."
     ))
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 7: IMPLEMENTATION DETAILS & TECHNOLOGY STACK
@@ -1693,7 +1712,7 @@ def build_report():
         for j, val in enumerate(row):
             t4.rows[i + 1].cells[j].paragraphs[0].add_run(val)
     style_table_professional(t4)
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 8: RESULT DISCUSSION AND COMPARATIVE ANALYSIS
@@ -1805,7 +1824,7 @@ def build_report():
     fig5_path = ASSETS_DIR / "fig5_baseline_comparisons.png"
     if fig5_path.exists():
         add_image_centered(doc, fig5_path, width_inches=5.6)
-        add_figure_caption(doc, "Figure 5: Comparative Baseline Performance Analysis")
+        add_figure_caption(doc, "Figure 5: Test-hospital performance (mean ± SD over 3 seeds): FedAvg + GNN vs No-GNN vs Local-only")
 
     add_para(doc, (
         "Key Findings from the Empirical Analysis:"
@@ -1813,14 +1832,14 @@ def build_report():
     add_para(doc, (
         "Finding 1 \u2014 Federated training helps, and more so for small hospitals: Both federated models "
         "clearly beat all three local-only models on the test hospitals (in-hospital mortality AUROC "
-        "0.819 and 0.807, versus 0.769, 0.660 and 0.583 for local-only on hospitals of 1,562, 458 and 87 "
+        "0.819 and 0.806, versus 0.769, 0.660 and 0.583 for local-only on hospitals of 1,562, 458 and 87 "
         "patients). The local-only result drops sharply as the single hospital gets smaller, while the "
         "federated models, which learn from 145 hospitals, stay strong. This is the clearest result of "
         "the study."
     ))
     add_para(doc, (
         "Finding 2 \u2014 The graph gives a small, consistent gain: Adding the patient graph improves the "
-        "mean in-hospital mortality AUROC from 0.807 to 0.819 and the ICU mortality AUROC from 0.842 to "
+        "mean in-hospital mortality AUROC from 0.806 to 0.819 and the ICU mortality AUROC from 0.842 to "
         "0.853. The gain is small and the standard-deviation bands overlap, but the GNN was at least as "
         "good as the No-GNN model in every one of the three seeds and had lower variance, so on this task "
         "the graph helps modestly rather than dramatically. We do not claim a large improvement from the "
@@ -1845,7 +1864,7 @@ def build_report():
     if fig6_path.exists():
         add_image_centered(doc, fig6_path, width_inches=5.2)
         add_figure_caption(doc, "Figure 6: Patient similarity graph built by the trained model on test hospital 120 (node colour = predicted in-hospital mortality; red ring = recorded death)")
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # CHAPTER 9: CONCLUSION AND FUTURE SCOPE
@@ -1910,13 +1929,13 @@ def build_report():
     add_para(doc, (
         "Future enhancements to this framework can proceed along several promising research trajectories:\n\n"
         "1. Dynamic Temporal Patient Graphs: Construct continuous-time dynamic graphs where patient nodes "
-        "and similarity edges evolve in real-time as hourly telemetry arrives, capturing temporal evolution "
+        "and similarity edges evolve as new time-series measurements arrive, capturing temporal evolution "
         "of clinical phenotypes.\n\n"
         "2. Differential Privacy & Secure Enclaves: Integrate formal Differential Privacy (DP-SGD) with "
         "gradient perturbation or homomorphic encryption to defend against model inversion and reconstruction "
         "attacks on shared parameters.\n\n"
         "3. Attention-Based Cross-Modal Fusion: Replace intermediate concatenation fusion with multi-head "
-        "cross-attention mechanisms enabling bidirectional conditioning between static and vital streams, "
+        "cross-attention mechanisms enabling bidirectional conditioning between the static and time-series streams, "
         "potentially capturing more nuanced cross-modal clinical interactions.\n\n"
         "4. Genuine Sepsis Label: Add a clinically defined sepsis label (e.g., from the diagnosis and "
         "microbiology tables with a fixed time horizon), rebuilding the infection-related input features to "
@@ -1926,7 +1945,7 @@ def build_report():
         "6. Personalized Federated Learning: Explore per-hospital personalization (e.g., FedProx, Ditto, "
         "or meta-learning) to better handle the large differences in hospital size and case mix."
     ))
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # REFERENCES (IEEE FORMAT - 25 REFERENCES)
@@ -1969,7 +1988,7 @@ def build_report():
         p_ref.paragraph_format.left_indent = Inches(0.3)
         p_ref.paragraph_format.first_line_indent = Inches(-0.3)
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # LIST OF PUBLICATIONS
@@ -1983,7 +2002,7 @@ def build_report():
         'Privacy-Preserving Clinical Risk Stratification on eICU," manuscript in preparation, 2026.'
     ), size=12, space_after=24)
 
-    doc.add_page_break()
+    page_break(doc)
 
     # ═════════════════════════════════════════════════════════════════════════
     # PLAGIARISM & AUTHENTICITY DECLARATION
@@ -2018,7 +2037,7 @@ def build_report():
         "repository.\n\n"
         "\u2022 Overall Authenticity: The text, code implementations, mathematical formulations, and "
         "experimental results presented in this document represent bonafide academic and engineering "
-        "contributions carried out exclusively by the project investigators."
+        "contributions carried out by the project investigators, with the AI assistance stated above."
     ), space_after=36)
 
     # Signature table

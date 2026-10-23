@@ -90,6 +90,8 @@ function App() {
   const neighbours = selectedNode
     ? graphData.links.filter(l => idOf(l.source) === selectedNode.id || idOf(l.target) === selectedNode.id).length
     : 0;
+  // Synthetic sample: both the "predictions" and the "outcomes" are random numbers
+  const isModel = graphData.meta.source === 'model';
 
   return (
     <div className="app-container">
@@ -108,15 +110,19 @@ function App() {
               <p className="muted">Anonymous label, not an eICU identifier.</p>
 
               <div className="section-title">
-                {graphData.meta.source === 'model' ? 'Model prediction' : 'Prediction (synthetic)'}
+                {isModel ? 'Model prediction' : 'Prediction (synthetic)'}
               </div>
               <ProbRow label="In-hospital mortality" p={selectedNode.pred_mortality} />
               <ProbRow label="ICU mortality" p={selectedNode.pred_icu_mortality} />
 
-              <div className="section-title">Recorded outcome (ground truth)</div>
+              <div className="section-title">{isModel ? 'Recorded outcome (ground truth)' : 'Outcome (synthetic)'}</div>
               <OutcomeRow label="In hospital" died={selectedNode.true_hospital_expired} />
               <OutcomeRow label="In ICU" died={selectedNode.true_icu_expired} />
-              <p className="muted">The model does not see this outcome when it makes the prediction above.</p>
+              <p className="muted">
+                {isModel
+                  ? 'The model does not see this outcome when it makes the prediction above.'
+                  : 'Random demonstration values: not a real patient and not a real outcome.'}
+              </p>
 
               <div className="stats-grid">
                 <div className="stat-box">
@@ -134,7 +140,9 @@ function App() {
               <Users size={48} />
               <h3 style={{ margin: '0 0 8px 0', fontWeight: 500, color: '#f8fafc' }}>Select a Patient</h3>
               <p style={{ margin: 0, fontSize: '0.875rem' }}>
-                Click a node to compare the model&apos;s prediction with the recorded outcome.
+                {isModel
+                  ? "Click a node to compare the model's prediction with the recorded outcome."
+                  : 'Click a node to see its synthetic demonstration values.'}
               </p>
             </div>
           )}
@@ -149,7 +157,7 @@ function App() {
               Predicted risk
             </button>
             <button aria-pressed={colorBy === 'outcome'} onClick={() => setColorBy('outcome')}>
-              Recorded outcome
+              {isModel ? 'Recorded outcome' : 'Outcome (synthetic)'}
             </button>
           </div>
           {colorBy === 'prediction' ? (
