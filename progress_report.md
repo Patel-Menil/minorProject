@@ -1,5 +1,11 @@
 # 📊 Federated Multimodal Graph Learning Framework - Progress Report
 
+> **Historical record, superseded.** This report was written before the correctness fixes
+> (patient alignment between modalities, the ICU-mortality target that was previously named "sepsis",
+> the 24-hour early-prediction window replacing the old 8-day window, and the hospital-level
+> train/val/test split). Its numbers are not valid results. The recorded corrected results are in
+> `results/corrected/benchmark_results.json`; see [README.md](README.md).
+
 Based on a detailed implementation and verification across `src/`, `scripts/`, `tests/`, `processed/`, and `pretrained_weights/`, here is the comprehensive breakdown of the project status.
 
 ## 📈 Overall Status Summary

@@ -50,3 +50,10 @@ results/**/*.pth
 # Superseded 8-day-window partial runs (kept locally only)
 results/superseded_8day_window/
 
+
+# Synthetic viva demo outputs (regenerate with: python scripts/run_demo.py all)
+demo_artifacts/
+# Built frontend (regenerate with: npm run build in frontend-playground/)
+frontend-playground/dist/
+# New research runs (results/corrected/ is the recorded experiment and stays tracked)
+results/rerun/

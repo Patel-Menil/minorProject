@@ -38,6 +38,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from src.datasets import OBS_HOURS, load_hospital_dataset
+from src.experiment_guard import MissingDataError, require_hospital_data
 from src.graph_builder import build_knn_graph
 from src.models import FederatedPatientModel
 from src.splits import load_or_create_split
@@ -82,13 +83,19 @@ def check_checkpoint(state_dict: dict) -> None:
 
 
 def real_graph(hospital: str, checkpoint: pathlib.Path) -> dict:
+    require_hospital_data(HOSPITALS_DIR, SPLIT_PATH)
     split = load_or_create_split(HOSPITALS_DIR, SPLIT_PATH)
     if HOSPITALS_DIR / hospital not in split["test"]:
         raise ValueError(f"{hospital} is not a test-split hospital; the demo must show out-of-sample predictions")
     if not checkpoint.exists():
-        raise FileNotFoundError(f"No checkpoint at {checkpoint}. Run scripts/train_federated.py first.")
+        raise FileNotFoundError(
+            f"No checkpoint at {checkpoint}. The corrected checkpoints are not in the repository; "
+            "retrain with scripts/run_experiments.py and pass --checkpoint results/rerun/fedavg_gnn/seed42/global_federated_model.pth."
+        )
 
     ckpt = torch.load(checkpoint, map_location="cpu")
+    if ckpt.get("synthetic_demo"):
+        raise ValueError("This is the synthetic demo checkpoint; real mode needs a model trained on eICU data")
     check_checkpoint(ckpt["model_state_dict"])
     if not ckpt.get("use_gnn", True):
         raise ValueError("This is a No-GNN checkpoint; the graph viewer needs a GNN model (fedavg_gnn)")
@@ -181,7 +188,11 @@ def main() -> None:
     if args.synthetic:
         data, out = synthetic_graph(), args.output or PUBLIC_DIR / "graph_data_synthetic.json"
     else:
-        data, out = real_graph(args.hospital, args.checkpoint), args.output or PUBLIC_DIR / "graph_data.json"
+        try:
+            data = real_graph(args.hospital, args.checkpoint)
+        except (MissingDataError, FileNotFoundError, ValueError) as e:
+            sys.exit(f"ERROR: {e}")
+        out = args.output or PUBLIC_DIR / "graph_data.json"
 
     out.parent.mkdir(parents=True, exist_ok=True)
     with open(out, "w") as f:

@@ -10,6 +10,7 @@ Verifies tensor shapes, forward propagation, and end-to-end gradient backward pa
 
 import pathlib
 import sys
+import pytest
 import torch
 from torch.utils.data import DataLoader
 
@@ -66,6 +67,9 @@ def test_patient_gnn_architectures():
     print("  [OK] Handled empty edge_index without errors")
 
 
+@pytest.mark.skipif(not (HOSPITAL_DIR / "tabular" / "tabular_features.parquet").exists(),
+                    reason="needs the prepared eICU hospital_102 Parquet files (not in the repository); "
+                           "tests/test_demo.py covers the same path on synthetic data")
 def test_end_to_end_model_and_loss():
     print("\n--- Test 2: End-to-End FederatedPatientModel on Hospital 102 ---")
 

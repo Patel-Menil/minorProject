@@ -1,0 +1,14 @@
+# Python 3.14 (tested with 3.14.7 on Windows 11, CPU only). Install into a project venv:
+#   python -m venv .venv
+#   .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+# The extra index provides the CPU-only PyTorch wheel (no CUDA download).
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.15.0
+torch_geometric==2.8.1
+numpy==2.5.4
+pandas==3.1.0
+pyarrow==26.0.0
+scikit-learn==1.9.1
+pytest==9.2.0
+# Only for the report/figure scripts (not needed for the demo or experiments):
+#   matplotlib networkx python-docx

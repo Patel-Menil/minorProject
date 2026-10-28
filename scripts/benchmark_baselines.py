@@ -10,13 +10,16 @@ nothing; it only evaluates:
   - fedavg_nognn      : same training and same sampled clients, no patient graph
   - local_<hospital>  : trained on one training-split hospital only
 
-Run folders: results/corrected/<run name>/seed<seed>/global_federated_model.pth
-Writes results/corrected/benchmark_results.json with per-seed results and the
-mean and standard deviation over seeds.
+Run folders: <results dir>/<run name>/seed<seed>/global_federated_model.pth
+(default results dir: results/rerun/). Writes <results dir>/benchmark_results.json
+with per-seed results and the mean and standard deviation over seeds.
+results/corrected/benchmark_results.json is the recorded result and is never
+overwritten. Run folders with a history but no valid checkpoint are reported
+by name instead of being skipped silently.
 
 Usage
 -----
-    python scripts/benchmark_baselines.py
+    python scripts/benchmark_baselines.py --results-dir results/rerun
 """
 
 import argparse
@@ -33,6 +36,8 @@ import torch
 
 from src.datasets import OBS_HOURS, load_hospital_dataset
 from src.evaluation import evaluate_model
+from src.experiment_guard import (RERUN_DIR, MissingDataError, refuse_protected, require_hospital_data,
+                                  run_status)
 from src.models import FederatedPatientModel
 from src.splits import load_or_create_split
 
@@ -43,7 +48,7 @@ PROCESSED_DIR = PROJECT_ROOT / "processed"
 HOSPITALS_DIR = PROCESSED_DIR / "hospitals"
 STATS_PATH = PROCESSED_DIR / "timeseries_stats.json"
 SPLIT_PATH = PROCESSED_DIR / "hospital_split.json"
-RESULTS_DIR = PROJECT_ROOT / "results" / "corrected"
+RESULTS_DIR = RERUN_DIR
 
 SUMMARY_METRICS = ["mort_auroc", "mort_auprc", "mort_brier", "icu_auroc", "icu_auprc", "icu_brier", "loss"]
 
@@ -102,19 +107,36 @@ def main() -> None:
     parser.add_argument("--split-seed", type=int, default=42, help="Must match the split used for training")
     parser.add_argument("--val-fraction", type=float, default=0.15, help="Must match the split used for training")
     parser.add_argument("--test-fraction", type=float, default=0.15, help="Must match the split used for training")
+    parser.add_argument("--data-dir", type=pathlib.Path, default=PROCESSED_DIR,
+                        help="Folder with hospitals/, hospital_split.json and timeseries_stats.json")
     args = parser.parse_args()
+    hospitals_dir, split_path = args.data_dir / "hospitals", args.data_dir / "hospital_split.json"
+    stats_path = args.data_dir / "timeseries_stats.json"
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # the banners use emoji; a piped Windows console is cp1252
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("=" * 75)
     print(" 📊 Benchmark on held-out test hospitals - eICU Multimodal Graph Learning")
     print("=" * 75)
 
-    run_dirs = sorted(p.parent for p in args.results_dir.glob("*/seed*/global_federated_model.pth"))
-    if not run_dirs:
-        raise FileNotFoundError(f"No runs found under {args.results_dir}. Run scripts/run_experiments.py first.")
+    try:
+        refuse_protected(args.results_dir, "benchmark_results.json")
+        candidates = sorted(p for p in args.results_dir.glob("*/seed*") if p.is_dir())
+        status = {p: run_status(p) for p in candidates}
+        bad = [f"  {p}: {reason}" for p, (s, reason) in status.items() if s == "incomplete"]
+        if bad:
+            raise FileNotFoundError("Incomplete run folders (no valid checkpoint + history):\n" + "\n".join(bad)
+                                    + "\nRetrain them with scripts/run_experiments.py --retrain-incomplete.")
+        run_dirs = [p for p, (s, _) in status.items() if s == "complete"]
+        if not run_dirs:
+            raise FileNotFoundError(f"No complete runs found under {args.results_dir}. Run scripts/run_experiments.py first.")
+        require_hospital_data(hospitals_dir, split_path)
+    except (MissingDataError, PermissionError, FileNotFoundError) as e:
+        sys.exit(f"ERROR: {e}")
 
-    split = load_or_create_split(HOSPITALS_DIR, SPLIT_PATH, args.split_seed, args.val_fraction, args.test_fraction)
-    test_datasets = [load_hospital_dataset(h, stats_path=STATS_PATH) for h in split["test"]]
+    split = load_or_create_split(hospitals_dir, split_path, args.split_seed, args.val_fraction, args.test_fraction)
+    test_datasets = [load_hospital_dataset(h, stats_path=stats_path) for h in split["test"]]
     print(f"Test hospitals: {len(test_datasets)} ({sum(len(d) for d in test_datasets)} patients) | Runs: {len(run_dirs)}")
 
     runs: Dict[str, Dict[str, Dict]] = {}
@@ -132,7 +154,7 @@ def main() -> None:
         json.dump({
             "protocol": {
                 "task": f"predict in-hospital and ICU mortality from the first {OBS_HOURS} h of the ICU stay (patients still in the ICU at {OBS_HOURS} h)",
-                "split_file": SPLIT_PATH.name,
+                "split_file": split_path.name,
                 "n_hospitals": {k: len(v) for k, v in split.items()},
                 "evaluated_on": "test hospitals (never used for training or checkpoint selection)",
                 "checkpoint_selection": "each run: round with the lowest loss on the validation hospitals",

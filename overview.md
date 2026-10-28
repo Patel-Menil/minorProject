@@ -14,6 +14,14 @@
 
 </div>
 
+> **Historical note (original specification).** This page is the project's original high-level
+> specification and is kept as a record. The implemented, corrected project differs: it predicts
+> **in-hospital mortality and ICU mortality** (`hospital_expired`, `icu_expired`) from the **first 24 h**
+> of the ICU stay (six 4-hour bins), uses **tabular + time-series** inputs only (no clinical-text encoder),
+> has **no sepsis head**, and compares FedAvg + GNN with a **No-GNN ablation and local-only baselines**
+> (no centralized all-data baseline). It reports AUROC, AUPRC, F1 and Brier rather than accuracy.
+> See [README.md](README.md) for the current scope, results and the synthetic viva demo.
+
 ---
 
 ## 📑 Table of Contents

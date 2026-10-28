@@ -1,5 +1,9 @@
 # 🏥 Federated Multimodal Graph Learning Framework - Core Pipeline Documentation
 
+> Current scope: in-hospital and ICU mortality from the first 24 h of the ICU stay (patients still in the
+> ICU at 24 h), tabular + time-series inputs, hospital-level train/val/test split. See [README.md](README.md)
+> for commands, results and the synthetic demo.
+
 This document serves as the developer guide and architectural overview for the end-to-end pipeline (Steps 1 through 8) and baseline benchmarking suite of the Federated Multimodal Graph Learning Framework on the eICU dataset.
 
 ## 🏗️ Architecture Overview
@@ -36,9 +40,9 @@ flowchart TD
 
     subgraph Multi-Task Prediction
         P --> Q1[Mortality Head]
-        P --> Q2[Sepsis/ICU Head]
+        P --> Q2[ICU Mortality Head]
         Q1 --> R1[Mortality Logits]
-        Q2 --> R2[Sepsis Logits]
+        Q2 --> R2[ICU Mortality Logits]
     end
 
     subgraph Federated Coordination
@@ -75,7 +79,7 @@ flowchart TD
 - Incorporates residual skip connections, batch normalization, and safe fallbacks for edge-less single-patient graphs.
 
 ### Step 6: Multi-task Prediction & End-to-End Model (`src/models.py`)
-- **`MultiTaskPredictionHeads`**: Dual heads predicting In-Hospital Mortality and Sepsis/ICU outcomes.
+- **`MultiTaskPredictionHeads`**: Dual heads predicting in-hospital mortality (`hospital_expired`) and ICU mortality (`icu_expired`).
 - **`FederatedPatientModel`**: Single end-to-end PyTorch module wrapping Encoders $\to$ Fusion $\to$ Graph Builder $\to$ GNN $\to$ Heads.
 - **`MultiTaskLoss`**: Weighted loss combining binary cross-entropy with `pos_weight=3.0` to address ICU outcome class imbalance.
 - **`src/metrics.py`**: Clinical metrics including AUROC, AUPRC, F1-Score, Precision, Recall, Specificity, and Brier calibration score.
@@ -83,35 +87,33 @@ flowchart TD
 ### Steps 7 & 8: Federated Training Orchestrator (`scripts/train_federated.py`)
 - **Client Training**: Simulates hospital clients training locally using private patient graphs. Caps local steps per round to prevent large-hospital dominance.
 - **Server Aggregation**: Samples hospital clients per communication round and executes sample-weighted FedAvg parameter aggregation.
-- **Checkpoints**: Saves best global model to `pretrained_weights/global_federated_model.pth` and logs to `pretrained_weights/training_history.json`.
+- **Checkpoints**: Saves the best global model (lowest validation loss) to `<out dir>/global_federated_model.pth` with `training_history.json` and `run_info.json`; new runs default to `results/rerun/`. `results/corrected/` holds the recorded runs and is never written to.
 
 ### Baseline Benchmarking Suite (`scripts/benchmark_baselines.py`)
 - Compares:
   1. **Local-Only Hospital Model**: Trains in isolation on a single hospital without federation.
   2. **Multimodal No-GNN Ablation**: Tabular + Time-Series without graph patient similarity.
   3. **Federated Multimodal Graph Model (FedAvg)**: Proposed privacy-preserving collaborative framework.
-- Evaluates on 15 held-out validation hospitals and outputs comparative metrics to `pretrained_weights/benchmark_results.json`.
+- Every model is trained by `scripts/train_federated.py` (local-only = `--train-hospitals`); the benchmark only evaluates the saved checkpoints on the 31 held-out **test** hospitals and writes `<results dir>/benchmark_results.json`.
 
 ---
 
 ## 🚀 Execution Commands
 
+Windows PowerShell, from the project root, after the setup in [README.md](README.md). Steps 1-2 need
+the prepared eICU hospital Parquet files in `processed/hospitals/`; without them they stop with an explanation.
+
 ### 1. Run Federated Training
-```bash
-source .venv/bin/activate
-python scripts/train_federated.py --rounds 5 --clients-per-round 6 --local-epochs 1 --gnn-type sage
+```powershell
+.\.venv\Scripts\python.exe scripts\train_federated.py --rounds 50 --clients-per-round 10 --out-dir results\rerun\fedavg_gnn\seed42
 ```
 
-### 2. Run Baseline Comparisons
-```bash
-source .venv/bin/activate
-python scripts/benchmark_baselines.py
+### 2. Run all experiments and the benchmark
+```powershell
+.\.venv\Scripts\python.exe scripts\run_experiments.py --out-root results\rerun
 ```
 
 ### 3. Run Test Suite
-```bash
-source .venv/bin/activate
-python tests/test_encoders.py
-python tests/test_fusion_graph.py
-python tests/test_gnn_model.py
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests -q
 ```

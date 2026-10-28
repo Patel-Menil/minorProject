@@ -11,7 +11,11 @@ Simulates (in one process) a federated network over the training-split hospitals
 4. Central server aggregates local weight updates using FedAvg (weighted by examples trained).
 5. Global model is scored on validation hospitals each round to pick the best checkpoint
    (test hospitals are left for benchmark_baselines.py).
-6. Saves the best checkpoint to `results/corrected/<run name>/seed<seed>/`.
+6. Saves the best checkpoint to `results/rerun/<run name>/seed<seed>/` (or --out-dir).
+   The recorded runs in results/corrected/ are never written to.
+
+Needs the prepared eICU hospital Parquet files (see README); without them it
+stops with a clear message. The synthetic viva demo is scripts/run_demo.py.
 
 Usage
 -----
@@ -43,6 +47,7 @@ from src.datasets import (
     load_hospital_dataset,
 )
 from src.evaluation import evaluate_model
+from src.experiment_guard import RERUN_DIR, MissingDataError, check_new_run_dir, require_hospital_data
 from src.models import FederatedPatientModel, MultiTaskLoss
 from src.splits import load_or_create_split
 
@@ -55,8 +60,8 @@ PROCESSED_DIR = PROJECT_ROOT / "processed"
 HOSPITALS_DIR = PROCESSED_DIR / "hospitals"
 STATS_PATH = PROCESSED_DIR / "timeseries_stats.json"
 SPLIT_PATH = PROCESSED_DIR / "hospital_split.json"
-# New runs go here; the original results in pretrained_weights/ are left untouched
-OUTPUT_DIR = PROJECT_ROOT / "results" / "corrected"
+# New runs go here; results/corrected/ (recorded runs) and pretrained_weights/ are left untouched
+OUTPUT_DIR = RERUN_DIR
 
 # Model hyperparameters
 TABULAR_EMB_DIM = 64
@@ -213,7 +218,11 @@ def main() -> None:
     parser.add_argument("--train-hospitals", nargs="+", default=None,
                         help="Restrict clients to these training-split hospitals (e.g. one hospital = local-only baseline)")
     parser.add_argument("--out-dir", type=pathlib.Path, default=None,
-                        help="Folder for the checkpoint, history and run info (default: results/corrected/<run name>/seed<seed>)")
+                        help="Folder for the checkpoint, history and run info (default: results/rerun/<run name>/seed<seed>)")
+    parser.add_argument("--overwrite", action="store_true",
+                        help="Replace an earlier run in --out-dir (never allowed for results/corrected/)")
+    parser.add_argument("--data-dir", type=pathlib.Path, default=PROCESSED_DIR,
+                        help="Folder with hospitals/, hospital_split.json and timeseries_stats.json (default: processed/)")
     parser.add_argument("--seed", type=int, default=42, help="Training seed (model init, client sampling, batch order)")
     parser.add_argument("--split-seed", type=int, default=42, help="Seed of the fixed hospital split (keep at 42)")
     args = parser.parse_args()
@@ -223,11 +232,20 @@ def main() -> None:
     else:
         run_name = "fedavg_nognn" if args.no_gnn else "fedavg_gnn"
     args.out_dir = args.out_dir or OUTPUT_DIR / run_name / f"seed{args.seed}"
+    hospitals_dir, split_path = args.data_dir / "hospitals", args.data_dir / "hospital_split.json"
+    stats_path = args.data_dir / "timeseries_stats.json"
+    try:
+        check_new_run_dir(args.out_dir, args.overwrite)
+        require_hospital_data(hospitals_dir, split_path)
+    except (MissingDataError, PermissionError, FileExistsError) as e:
+        sys.exit(f"ERROR: {e}")
 
     random.seed(args.seed)
     np.random.seed(args.seed)
     torch.manual_seed(args.seed)
 
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # the banners use emoji; a piped Windows console is cp1252
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("=" * 70)
     print(" 🏥 Federated Multimodal Graph Learning - In-Hospital & ICU Mortality Prediction")
@@ -238,27 +256,27 @@ def main() -> None:
 
     # 1-2. Fixed hospital split shared with benchmark_baselines.py.
     # Test hospitals are never loaded here: they are only for the final benchmark.
-    split = load_or_create_split(HOSPITALS_DIR, SPLIT_PATH, args.split_seed, args.val_fraction, args.test_fraction)
+    split = load_or_create_split(hospitals_dir, split_path, args.split_seed, args.val_fraction, args.test_fraction)
     train_hospitals, val_hospitals = split["train"], split["val"]
     if args.train_hospitals:
-        chosen = [HOSPITALS_DIR / h for h in args.train_hospitals]
+        chosen = [hospitals_dir / h for h in args.train_hospitals]
         not_train = [h.name for h in chosen if h not in train_hospitals]
         if not_train:
             raise ValueError(f"Not training-split hospitals: {not_train}")
         train_hospitals = chosen
 
-    print(f"\nHospital split ({SPLIT_PATH.name}):")
+    print(f"\nHospital split ({split_path.name}):")
     print(f"  Training Hospitals   : {len(train_hospitals)}")
     print(f"  Validation Hospitals : {len(val_hospitals)} (checkpoint selection only)")
     print(f"  Test Hospitals       : {len(split['test'])} (not used during training)")
 
     # Load validation hospitals once; every round is scored on all of them
-    val_datasets = [load_hospital_dataset(h, stats_path=STATS_PATH) for h in val_hospitals]
+    val_datasets = [load_hospital_dataset(h, stats_path=stats_path) for h in val_hospitals]
     print(f"  Validation Patients  : {sum(len(d) for d in val_datasets)}")
 
     # 3. Detect input dimensions from first hospital
     sample_tab = EICUTabularDataset(train_hospitals[0], fit_scaler=True)
-    sample_ts = EICUTimeSeriesDataset(train_hospitals[0], stats_path=STATS_PATH)
+    sample_ts = EICUTimeSeriesDataset(train_hospitals[0], stats_path=stats_path)
     tabular_dim = sample_tab.input_dim
     timeseries_dim = sample_ts.input_dim
 
@@ -308,7 +326,8 @@ def main() -> None:
             "git_commit": commit,
             "uncommitted_code_changes": dirty,
             "args": {k: str(v) if isinstance(v, pathlib.Path) else v for k, v in vars(args).items()},
-            "split_file": SPLIT_PATH.name,
+            "split_file": split_path.name,
+            "data_dir": str(args.data_dir),
             "n_hospitals": {k: len(v) for k, v in split.items()},
             "n_val_patients": sum(len(d) for d in val_datasets),
             "checkpoint_selection": "round with the lowest validation loss",
@@ -336,7 +355,7 @@ def main() -> None:
                 state, stats = train_local_client(
                     global_model=global_model,
                     hospital_dir=hdir,
-                    stats_path=STATS_PATH,
+                    stats_path=stats_path,
                     local_epochs=args.local_epochs,
                     batch_size=args.batch_size,
                     lr=args.lr,
