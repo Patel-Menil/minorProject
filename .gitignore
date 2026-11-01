@@ -72,3 +72,7 @@ results/minor_project_sepsis_posweight3/
 /humanized_BTech_Minor_Project_Report_Final.docx
 # Local editor and agent settings
 .claude/
+# Report documents stay local
+/*.docx
+/*.pdf
+/*.zip
