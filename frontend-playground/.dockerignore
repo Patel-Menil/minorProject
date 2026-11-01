@@ -1,0 +1,6 @@
+node_modules
+dist
+# real-model graph export (per-patient, derived from eICU): never part of an image
+public/graph_data.json
+.vite
+*.log

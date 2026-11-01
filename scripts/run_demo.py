@@ -157,7 +157,7 @@ def cmd_all(args) -> None:
 
 def cmd_serve(args) -> None:
     from demo.server import serve
-    serve(port=args.port)
+    serve(port=args.port, final_root=args.final_root)
 
 
 def main() -> None:
@@ -178,6 +178,8 @@ def main() -> None:
         sp.add_argument("--hospital", default=None, help="predict: hospital for --new-patient")
         sp.add_argument("--threshold", type=float, default=dp.THRESHOLD)
         sp.add_argument("--port", type=int, default=8765)
+        sp.add_argument("--final-root", type=pathlib.Path, default=None,
+                        help="serve: folder of the final real-data model (default results/minor_project_final)")
     args = parser.parse_args()
     command = args.command or "all"
     if command == "all" and args.command is None:

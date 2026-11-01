@@ -1,0 +1,8 @@
+# Model service dependencies: same versions as requirements.txt (the tested local environment), CPU-only torch.
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.15.0
+torch_geometric==2.8.1
+numpy==2.5.4
+pandas==3.1.0
+pyarrow==26.0.0
+scikit-learn==1.9.1

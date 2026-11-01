@@ -17,6 +17,24 @@ export async function api(path) {
   return body;
 }
 
+// POST JSON to the demo API; server errors (e.g. invalid input, missing checkpoint) are thrown as they are
+export async function apiPost(path, payload) {
+  let res;
+  try {
+    res = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  } catch {
+    throw new Error('Demo API not reachable. Start it with: python scripts/run_demo.py serve');
+  }
+  let body;
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error(`Demo API not reachable at ${path} (no JSON answer). Start it with: python scripts/run_demo.py serve`);
+  }
+  if (!res.ok) throw new Error(body.error || `Request failed (${res.status})`);
+  return body;
+}
+
 export const pct = p => `${(p * 100).toFixed(1)}%`;
 export const fmt = (v, d = 3) => (v === null || v === undefined || Number.isNaN(v) ? '–' : Number(v).toFixed(d));
 

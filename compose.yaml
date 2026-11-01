@@ -1,0 +1,72 @@
+# Three-container demo: frontend (nginx) -> backend (API) -> model (trained checkpoint inference).
+# Start it with run-demo.ps1, which picks a free host port and writes it to .env.runtime.
+# Only the frontend is published, and only on 127.0.0.1. Data and checkpoints are read-only bind mounts.
+name: minorproject-demo
+
+services:
+  model:
+    build:
+      context: .
+      dockerfile: Dockerfile.model
+    image: minorproject-demo/model:latest
+    container_name: minorproject-model
+    environment:
+      MODEL_PORT: "8001"
+    volumes:
+      - ./processed:/app/processed:ro            # prepared eICU hospitals + sepsis labels (local only)
+      - ./results:/app/results:ro                 # trained checkpoints, manifests, recorded results
+      - ./demo_artifacts:/app/demo_artifacts:ro   # synthetic demo (separate, labelled mode)
+    networks: [demo-net]
+    expose: ["8001"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8001/health', timeout=10).status == 200 else 1)"]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 180s
+    restart: on-failure:3
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    image: minorproject-demo/backend:latest
+    container_name: minorproject-backend
+    environment:
+      BACKEND_PORT: "8000"
+      MODEL_URL: http://model:8001
+    networks: [demo-net]
+    expose: ["8000"]
+    depends_on:
+      model:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=10).status == 200 else 1)"]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 20s
+    restart: on-failure:3
+
+  frontend:
+    build:
+      context: ./frontend-playground
+    image: minorproject-demo/frontend:latest
+    container_name: minorproject-frontend
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT:-8765}:80"
+    networks: [demo-net]
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/api/health"]
+      interval: 10s
+      timeout: 12s
+      retries: 3
+      start_period: 10s
+    restart: on-failure:3
+
+networks:
+  demo-net:
+    name: minorproject-demo-net

@@ -1,0 +1,19 @@
+# Model service: loads the trained mortality + sepsis checkpoint and runs real inference.
+# Code only - data, checkpoints and results are mounted read-only at runtime (see compose.yaml).
+FROM python:3.14-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PYTHONIOENCODING=utf-8 PIP_NO_CACHE_DIR=1
+WORKDIR /app
+
+COPY docker/requirements-model.txt /tmp/requirements-model.txt
+RUN pip install -r /tmp/requirements-model.txt
+
+COPY src/ src/
+COPY scripts/ scripts/
+COPY demo/ demo/
+COPY services/model_service.py services/model_service.py
+
+RUN useradd --create-home --uid 10001 app
+USER app
+EXPOSE 8001
+CMD ["python", "services/model_service.py"]

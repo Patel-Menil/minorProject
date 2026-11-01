@@ -72,7 +72,7 @@ function Stat({ value, label }) {
 }
 
 // ── Predict ─────────────────────────────────────────────────────────────────
-function Strip({ values }) {
+export function Strip({ values }) {
   const max = Math.max(...values.map(v => Math.abs(v)), 1e-6);
   return (
     <div className="strip" title={`${values.length} values`}>

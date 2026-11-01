@@ -1,0 +1,15 @@
+# Allowlist: only source code enters the backend / model build context.
+# Data (processed/), checkpoints and results (results/, pretrained_weights/), demo outputs
+# (demo_artifacts/), environments, reports and runtime files are never sent to the Docker daemon;
+# the model service reads data and checkpoints through read-only bind mounts instead.
+*
+!src/
+!scripts/
+!demo/
+!services/
+!docker/
+**/__pycache__
+**/*.pyc
+**/*.pth
+**/*.parquet
+**/*.csv

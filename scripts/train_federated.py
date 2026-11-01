@@ -103,6 +103,8 @@ def train_local_client(
     lr: float,
     device: torch.device,
     max_steps_per_client: int = 30,
+    loader=None,
+    pos_weight_second=None,
 ) -> Tuple[Dict[str, torch.Tensor], Dict]:
     """
     Simulates local hospital client training.
@@ -113,7 +115,7 @@ def train_local_client(
     FedAvg weights clients by "examples", not by cohort size.
     """
     # Load hospital's local data, tabular + time-series paired by patient ID
-    ds = load_hospital_dataset(hospital_dir, stats_path=stats_path)
+    ds = (loader or load_hospital_dataset)(hospital_dir, stats_path=stats_path)
     stats = {"patients": len(ds), "examples": 0, "steps": 0, "patient_ids": set()}
     if len(ds) < 2:
         return global_model.state_dict(), stats  # 0 examples -> zero weight in FedAvg
@@ -130,7 +132,7 @@ def train_local_client(
         w_mortality=W_MORTALITY,
         w_icu=W_ICU,
         pos_weight_mortality=POS_WEIGHT_MORTALITY,
-        pos_weight_icu=POS_WEIGHT_ICU,
+        pos_weight_icu=POS_WEIGHT_ICU if pos_weight_second is None else pos_weight_second,
     )
 
     steps = 0
@@ -221,6 +223,12 @@ def main() -> None:
                         help="Folder for the checkpoint, history and run info (default: results/rerun/<run name>/seed<seed>)")
     parser.add_argument("--overwrite", action="store_true",
                         help="Replace an earlier run in --out-dir (never allowed for results/corrected/)")
+    parser.add_argument("--task", choices=["mortality_icu", "mortality_sepsis"], default="mortality_icu",
+                        help="Second head: ICU mortality (default) or sepsis documented after 24 h (src/sepsis_task.py)")
+    parser.add_argument("--pos-weight-second", type=float, default=POS_WEIGHT_ICU,
+                        help="Positive-class weight of the second head's BCE loss (default 3.0)")
+    parser.add_argument("--sepsis-labels", type=pathlib.Path, default=None,
+                        help="--task mortality_sepsis: labels from scripts/build_sepsis_labels.py (default <data dir>/sepsis_labels.parquet)")
     parser.add_argument("--data-dir", type=pathlib.Path, default=PROCESSED_DIR,
                         help="Folder with hospitals/, hospital_split.json and timeseries_stats.json (default: processed/)")
     parser.add_argument("--seed", type=int, default=42, help="Training seed (model init, client sampling, batch order)")
@@ -271,14 +279,31 @@ def main() -> None:
     print(f"  Test Hospitals       : {len(split['test'])} (not used during training)")
 
     # Load validation hospitals once; every round is scored on all of them
-    val_datasets = [load_hospital_dataset(h, stats_path=stats_path) for h in val_hospitals]
+    loader, task_info = None, {"task_id": "mortality_icu", "targets": ["hospital_expired", "icu_expired"]}
+    if args.task == "mortality_sepsis":
+        from functools import partial
+        from src import sepsis_task
+        labels_path = args.sepsis_labels or args.data_dir / "sepsis_labels.parquet"
+        if not labels_path.exists():
+            sys.exit(f"ERROR: {labels_path} not found. Run scripts/build_sepsis_labels.py first.")
+        loader = partial(sepsis_task.load_sepsis_hospital_dataset, labels_path=str(labels_path))
+        canonical = json.loads((args.data_dir / "canonical_tabular_features.json").read_text())
+        task_info = {"task_id": args.task, "targets": sepsis_task.TARGETS, "sepsis_labels": str(labels_path),
+                     "tabular_features": sepsis_task.sepsis_tabular_features(canonical),
+                     "removed_tabular_prefixes": list(sepsis_task.LEAKY_TABULAR_PREFIXES)}
+    load = loader or load_hospital_dataset
+    val_datasets = [load(h, stats_path=stats_path) for h in val_hospitals]
     print(f"  Validation Patients  : {sum(len(d) for d in val_datasets)}")
 
     # 3. Detect input dimensions from first hospital
-    sample_tab = EICUTabularDataset(train_hospitals[0], fit_scaler=True)
-    sample_ts = EICUTimeSeriesDataset(train_hospitals[0], stats_path=stats_path)
-    tabular_dim = sample_tab.input_dim
-    timeseries_dim = sample_ts.input_dim
+    if loader is None:
+        sample_tab = EICUTabularDataset(train_hospitals[0], fit_scaler=True)
+        sample_ts = EICUTimeSeriesDataset(train_hospitals[0], stats_path=stats_path)
+        tabular_dim = sample_tab.input_dim
+        timeseries_dim = sample_ts.input_dim
+    else:
+        sample = loader(train_hospitals[0], stats_path=stats_path)
+        tabular_dim, timeseries_dim = sample.tabular_dim, sample.timeseries_dim
 
     print(f"  Tabular Input Dim    : {tabular_dim}")
     print(f"  Time-series Input Dim: {timeseries_dim}")
@@ -322,7 +347,11 @@ def main() -> None:
         json.dump({
             "script": "train_federated.py",
             "run_name": run_name,
-            "task": f"predict in-hospital and ICU mortality from the first {OBS_HOURS} h of the ICU stay (patients still in the ICU at {OBS_HOURS} h)",
+            "task": (f"predict in-hospital and ICU mortality from the first {OBS_HOURS} h of the ICU stay (patients still in the ICU at {OBS_HOURS} h)"
+                     if loader is None else
+                     f"predict in-hospital mortality and sepsis first documented after {OBS_HOURS} h, from the first {OBS_HOURS} h "
+                     f"(stays >= {OBS_HOURS} h without sepsis documented by {OBS_HOURS} h)"),
+            **task_info,
             "git_commit": commit,
             "uncommitted_code_changes": dirty,
             "args": {k: str(v) if isinstance(v, pathlib.Path) else v for k, v in vars(args).items()},
@@ -356,6 +385,8 @@ def main() -> None:
                     global_model=global_model,
                     hospital_dir=hdir,
                     stats_path=stats_path,
+                    loader=loader,
+                    pos_weight_second=args.pos_weight_second,
                     local_epochs=args.local_epochs,
                     batch_size=args.batch_size,
                     lr=args.lr,
@@ -396,6 +427,8 @@ def main() -> None:
                 "use_gnn": not args.no_gnn,
                 "run_name": run_name,
                 "seed": args.seed,
+                **({} if loader is None else {"task": task_info["task_id"], "targets": task_info["targets"],
+                                              "tabular_features": task_info["tabular_features"]}),
             }, save_path)
 
         round_record = {
@@ -425,7 +458,7 @@ def main() -> None:
             f"Clients: {len(client_updates):2d} ({round_examples:4d} examples, {round_steps} steps) | "
             f"Loss: {metrics['val_loss']:.4f} | "
             f"Mort AUROC: {metrics['mort_auroc']:.4f} (AUPRC: {metrics['mort_auprc']:.4f}) | "
-            f"ICU AUROC: {metrics['icu_auroc']:.4f}{marker}"
+            f"{'ICU' if loader is None else 'Sepsis'} AUROC: {metrics['icu_auroc']:.4f}{marker}"
         )
 
     # Save training history

@@ -57,3 +57,18 @@ demo_artifacts/
 frontend-playground/dist/
 # New research runs (results/corrected/ is the recorded experiment and stays tracked)
 results/rerun/
+# Final model trained on restricted eICU data: keep local (weights, logs and outputs derived from patient data)
+results/minor_project_final/
+# Sepsis proxy labels (per-patient, derived from eICU) and the mortality + sepsis model: keep local
+processed/sepsis_labels.parquet
+results/minor_project_sepsis/
+results/minor_project_sepsis_posweight3/
+# Docker demo runtime port (written by run-demo.ps1)
+.env.runtime
+
+# Generated report documents (rebuild with scripts/build_final_report.py); keep local
+/BTech_Minor_Project_Report_Final.*
+/BTech_Project_Report_Reviewed_Draft_2026*
+/humanized_BTech_Minor_Project_Report_Final.docx
+# Local editor and agent settings
+.claude/
